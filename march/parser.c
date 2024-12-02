@@ -57,6 +57,7 @@ int initFormula( FILE* in )
 	nrofclauses          = 0;
         nrofceq              = 0;
 	initial_freevars     = 0;
+	initial_freeentryvars= 0;
 	non_tautological_equivalences = 0;
         lookaheadArrayLength = 0;
 	forced_literals = 0;
@@ -89,8 +90,10 @@ int initFormula( FILE* in )
 	freevars    = nrofvars;
 
 	if ((nrofclauses / nrofvars) > 10) {
+/*
           if (quiet_mode == 0)
 	    printf("c full lookahead due to high density!\n");
+*/
 	  percent = 100; }
 	else
 	   percent = PERCENT;
