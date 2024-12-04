@@ -109,9 +109,9 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             if solveaftercubeg == 'True':
                 os.remove(f'{cube}{index}.cnf')
                 if solving_mode_g == "satcas":
-                    command = f"./solve.sh {order} {file_to_cube} -maplesat {t} -cas"
+                    command = f"./solve.sh {order} {file_to_cube} -maplesat {timeout_g} -cas"
                 else:
-                    command = f"./solve.sh {order} {file_to_cube} -maplesat {t}"
+                    command = f"./solve.sh {order} {file_to_cube} -maplesat {timeout_g}"
                 queue.put(command)
             return
     if cutoff == 'v':
@@ -119,9 +119,9 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             if solveaftercubeg == 'True':
                 os.remove(f'{cube}{index}.cnf')
                 if solving_mode_g == "satcas":
-                    command = f"./solve.sh {order} {file_to_cube} -maplesat {t} -cas"
+                    command = f"./solve.sh {order} {file_to_cube} -maplesat {timeout_g} -cas"
                 else:
-                    command = f"./solve.sh {order} {file_to_cube} -maplesat {t}"
+                    command = f"./solve.sh {order} {file_to_cube} -maplesat {timeout_g}"
                 queue.put(command)
             return
 
