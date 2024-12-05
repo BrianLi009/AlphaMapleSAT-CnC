@@ -1,24 +1,25 @@
 #!/bin/bash
 
-n=$1 #order
-f=$2 #instance file name
-solver=$3 #solver type
-t=$4 #timeout in seconds
-mode=$5 #solver mode (optional)
+# Reorder parameters
+n=$1      #order
+solver=$2  #solver type
+t=$3      #timeout in seconds
+mode=$4    #solver mode (optional)
+f=$5      #instance file name (moved to last)
 
 [ "$1" = "-h" -o "$1" = "--help" -o "$#" -lt 4 ] && echo "
 Description:
     Script for solving and generating drat proof for instance
 
 Usage:
-    ./solve.sh n f solver t [mode]
+    ./solve.sh n solver t [mode] f
 
 Arguments:
     <n>: the order of the instance/number of vertices in the graph
-    <f>: file name of the CNF instance to be solved
     <solver>: -cadical or -maplesat
     <t>: timeout in seconds
     [mode]: -cas (optional)
+    <f>: file name of the CNF instance to be solved
 " && exit
 
 # Select solver based on arguments
