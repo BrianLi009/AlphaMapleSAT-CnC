@@ -101,7 +101,10 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     result = subprocess.run(command, shell=True, text=True, capture_output=True)
     var_removed = int(result.stdout.strip())
     if extension == "True":
-        cutoffv = var_removed * 2
+        if cutoff == 'v':
+            cutoffv = var_removed * 2
+        else:
+            cutoffv = cutoffv * 2
 
     print (f'{var_removed} variables removed from the cube')
 
