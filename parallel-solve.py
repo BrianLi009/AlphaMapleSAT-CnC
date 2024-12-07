@@ -4,7 +4,7 @@ import os
 import queue
 import argparse
 
-remove_file = False
+remove_file = True
 
 def run_command(command):
     process_id = os.getpid()
