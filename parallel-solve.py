@@ -4,6 +4,8 @@ import os
 import queue
 import argparse
 
+remove_file = False
+
 def run_command(command):
     process_id = os.getpid()
     print(f"Process {process_id}: Executing command: {command}")
@@ -33,11 +35,11 @@ def run_cube_command(command):
     print (command)
     eval(command)
 
-def remove_related_files(new_file):
-    files_to_remove = [
-        new_file,
-    ]
-
+def remove_related_files(files_to_remove):
+    global remove_file
+    if not remove_file:
+        return
+        
     for file in files_to_remove:
         try:
             os.remove(file)
@@ -91,9 +93,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
         if "c exit 20" in file.read():
             print("the cube is UNSAT")
             if cube != "N":
-                os.remove(f'{cube}{index}.cnf')
-            os.remove(file_to_cube)
-            os.remove(file_to_check)
+                files_to_remove = [f'{cube}{index}.cnf', file_to_cube, file_to_check]
+                remove_related_files(files_to_remove)
             return
     
     command = f"sed -E 's/.* 0 [-]*([0-9]*) 0$/\\1/' < {file_to_check} | awk '$0<={m}' | sort | uniq | wc -l"
@@ -107,7 +108,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     if cutoff == 'd':
         if d >= cutoffv:
             if solveaftercubeg == 'True':
-                os.remove(f'{cube}{index}.cnf')
+                files_to_remove = [f'{cube}{index}.cnf']
+                remove_related_files(files_to_remove)
                 if solving_mode_g == "satcas":
                     command = f"./solve.sh {order} -maplesat {timeout_g} -cas {file_to_cube}"
                 else:
@@ -117,7 +119,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     if cutoff == 'v':
         if var_removed >= cutoffv:
             if solveaftercubeg == 'True':
-                os.remove(f'{cube}{index}.cnf')
+                files_to_remove = [f'{cube}{index}.cnf']
+                remove_related_files(files_to_remove)
                 if solving_mode_g == "satcas":
                     command = f"./solve.sh {order} -maplesat {timeout_g} -cas {file_to_cube}"
                 else:
@@ -129,7 +132,7 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     if cubing_mode_g == "march":
         subprocess.run(f"./march/march_cu {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp", shell=True)
     else:  # ams mode
-        subprocess.run(f"python3 -u alpha-zero-general/main.py {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp -order {order} -prod -numMCTSSims {numMCTS}", shell=True)
+        subprocess.run(f"python3 -u alpha-zero-general/main.py {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp -prod -numMCTSSims {numMCTS}", shell=True)
 
     #output {file_to_cube}.temp with the cubes
     d += 1
@@ -140,20 +143,27 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
         subprocess.run(f'mv {file_to_cube}.temp {original_file}0', shell=True)
         next_cube = f'{original_file}0'
     if cube != "N":
-        os.remove(f'{cube}{index}.cnf')
-        os.remove(f'{file_to_cube}.temp')
-    os.remove(file_to_cube)
-    os.remove(file_to_check)
+        files_to_remove = [
+            f'{cube}{index}.cnf',
+            f'{file_to_cube}.temp',
+            file_to_cube,
+            file_to_check
+        ]
+        remove_related_files(files_to_remove)
+    else:
+        files_to_remove = [file_to_cube, file_to_check]
+        remove_related_files(files_to_remove)
     command1 = f"cube('{original_file}', '{next_cube}', 1, {m}, '{order}', {numMCTS}, queue, '{cutoff}', {cutoffv}, {d})"
     command2 = f"cube('{original_file}', '{next_cube}', 2, {m}, '{order}', {numMCTS}, queue, '{cutoff}', {cutoffv}, {d})"
     queue.put(command1)
     queue.put(command2)
 
-def main(order, file_name_solve, solving_mode="other", cubing_mode="march", numMCTS=2, cutoff='d', cutoffv=5, solveaftercube='True', timeout=3600):
+def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", numMCTS=2, cutoff='d', cutoffv=5, solveaftercube='True', timeout=3600):
     """
     Parameters:
-    - order: the order of the graph
+    - order: the order of the graph (required for satcas mode)
     - file_name_solve: input file name
+    - m: number of variables to consider for cubing (required)
     - solving_mode: 'satcas' (cadical simplification with cas, maplesat solving with cas) 
                    or 'other' (cadical simplification no cas, maplesat solving no cas)
     - cubing_mode: 'march' (use march_cu) or 'ams' (use alpha-zero-general)
@@ -168,11 +178,15 @@ def main(order, file_name_solve, solving_mode="other", cubing_mode="march", numM
         raise ValueError("solving_mode must be either 'satcas' or 'other'")
     if cubing_mode not in ["march", "ams"]:
         raise ValueError("cubing_mode must be either 'march' or 'ams'")
+    if m is None:
+        raise ValueError("m parameter must be specified")
+    if solving_mode == "satcas" and order is None:
+        raise ValueError("order parameter must be specified when using satcas mode")
 
     d = 0
     cutoffv = int(cutoffv)
-    m = int(int(order)*(int(order)-1)/2)
-    
+    m = int(m)
+
     # Update global variables
     global queue, orderg, numMCTSg, cutoffg, cutoffvg, dg, mg, solveaftercubeg, file_name_solveg, solving_mode_g, cubing_mode_g, timeout_g
     orderg, numMCTSg, cutoffg, cutoffvg, dg, mg, solveaftercubeg, file_name_solveg = order, numMCTS, cutoff, cutoffv, d, m, solveaftercube, file_name_solve
@@ -218,10 +232,13 @@ def main(order, file_name_solve, solving_mode="other", cubing_mode="march", numM
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        epilog='Example usage: python3 parallel-solve.py 17 instances/ks_17.cnf --solving-mode satcas --cubing-mode ams --timeout 7200'
+        epilog='Example usage: python3 parallel-solve.py 17 instances/ks_17.cnf -m 136 --solving-mode satcas --cubing-mode ams --timeout 7200'
     )
-    parser.add_argument('order', type=int, help='Order of the graph')
+    parser.add_argument('order', type=int, nargs='?', default=None, 
+                        help='Order of the graph (required for satcas mode)')
     parser.add_argument('file_name_solve', help='Input file name')
+    parser.add_argument('-m', type=int, required=True,
+                        help='Number of variables to consider for cubing')
     parser.add_argument('--solving-mode', choices=['satcas', 'other'], default='other',
                         help='Solving mode: satcas (cadical+cas) or other (default)')
     parser.add_argument('--cubing-mode', choices=['march', 'ams'], default='march',
@@ -238,5 +255,10 @@ if __name__ == "__main__":
                         help='Timeout in seconds (default: 3600)')
 
     args = parser.parse_args()
-    main(args.order, args.file_name_solve, args.solving_mode, args.cubing_mode,
+    
+    # Additional validation
+    if args.solving_mode == "satcas" and args.order is None:
+        parser.error("order parameter is required when using satcas mode")
+
+    main(args.order, args.file_name_solve, args.m, args.solving_mode, args.cubing_mode,
          args.numMCTS, args.cutoff, args.cutoffv, args.solveaftercube, args.timeout)
