@@ -23,9 +23,9 @@ pysat_propagate_obj = None
 
 class BoardMode0(Board):
 
-    def __init__(self, args, cnf, edge_dict, max_metric_val, pysat_propagate):
-        Board.__init__(self, args, cnf, edge_dict, pysat_propagate)
-        self.order = args.order
+    def __init__(self, args, cnf, max_metric_val, pysat_propagate):
+        Board.__init__(self, args, cnf, pysat_propagate)
+        self.max_literals = args.MAX_LITERALS
         self.valid_literals = None
         self.prob = None
         self.march_pos_lit_score_dict = None
@@ -53,7 +53,7 @@ class BoardMode0(Board):
 
     def calculate_march_metrics(self):
         if self.args.debugging: log.info(f"Calculating march metrics")
-        edge_vars = self.order*(self.order-1)//2 
+        edge_vars = self.max_literals
         assert pysat_propagate_obj is not None
         prior_actions_flat = list(itertools.chain.from_iterable(self.prior_actions))
         res, len_asgn_edge_vars, march_pos_lit_score_dict_all = pysat_propagate_obj.propagate(Node(prior_actions_flat))

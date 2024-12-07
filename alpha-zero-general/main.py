@@ -126,67 +126,14 @@ def main(args_parsed):
         c.nolearnMCTS()
         return
 
-    # else ---
-    c.learn()
-
-    # wandb.save('arena_cubes.txt')
-    wandb.save('tmp.cnf')
-    wandb.save('tmp.cubes')
-    wandb.save('trainExamples.pkl')
-
-    if args.MCTSmode == 1:
-
-        data = [[x, y] for (x, y) in zip(g.log_giveup_rew, g.log_eval_var)]
-        table = wandb.Table(data=data, columns = ["solver_reward (NA)", "eval_var (NA)"])
-        wandb.log({"solver_rew vs eval_var (Non-Arena)" : wandb.plot.scatter(table,
-                                    "solver_reward (NA)", "eval_var (NA)")})
-        
-        data = [[x, y] for (x, y) in zip(g.log_giveup_rewA, g.log_eval_varA)]
-        table = wandb.Table(data=data, columns = ["solver_reward (A)", "eval_var (A)"])
-        wandb.log({"solver_rew vs eval_var (Arena)" : wandb.plot.scatter(table,
-                                    "solver_reward (A)", "eval_var (A)")})
-        
-        # data = [[s] for s in g.log_giveup_rewA]
-        # table = wandb.Table(data=data, columns=["solver_reward"])
-        fig = plt.figure(figsize =(10, 7))
-        plt.boxplot(g.log_giveup_rewA)
-        plt.savefig("boxplot1.png")
-        wandb.log({"Solver rewards (Arena)": wandb.Image("boxplot1.png")})
-        # wandb.log({'Solver rewards (Arena)': wandb.plot.histogram(table, "solver_reward (A)",
-        #                         title="Histogram")})
-        
-        # data = [[s] for s in g.log_eval_varA]
-        # table = wandb.Table(data=data, columns=["eval_var"])
-        plt.boxplot(g.log_eval_varA)
-        plt.savefig("boxplot2.png")
-        wandb.log({"Eval Var (Arena)": wandb.Image("boxplot2.png")})
-        # wandb.log({'Eval Var (Arena)': wandb.plot.histogram(table, "eval_var (A)",
-        #                         title="Histogram")})
-        
-        if len(g.log_sat_asgn) > 0:
-            log_sat_asgn_set = set([frozenset(asgn) for asgn in g.log_sat_asgn])
-            data = [[" ".join([str(x) for x in s])] for s in log_sat_asgn_set]
-            table =  wandb.Table(data=data, columns=['SAT Assignment'])
-            wandb.log({"sat_model": table})
-
-            asgn = data[0][0] # one sat assignment
-            asgn = list(map(int, asgn.split(" ")))
-            asgn_pos = [a for a in asgn if a > 0]
-            triu = [1 if i+1 in asgn_pos else 0 for i in range(g.edge_count)]
-            g.print_graph(g.triu2adj(triu))
-        
-        # TODO: wandb.save(f"saved_models/{args.model_name}_epc{epoch}_acc{test_acc:.4f}.pt")
-
 if __name__ == "__main__":
-    # python -u main.py "constraints_17_c_100000_2_2_0_final.simp" -d 1 -m 136 -o "test.cubes" -order 17 -prod
-    # python -u main.py "constraints_18_c_100000_2_2_0_final.simp" -order 18 -n 20 -m 153 -o "e4_18_mcts_best_varpen.cubes" -numMCTSSims 300 -cpuct 3 -varpen 0.1 > cubing_outputs/e4_18_mcts_best_varpen.out 2>&1
-    # python -u main.py "constraints_19_c_100000_2_2_0_final.simp" -order 19 -n 20 -m 171 -o "e4_19_mcts_best_varpen.cubes" -numMCTSSims 300 -cpuct 0.5 -varpen 0.1 > cubing_outputs/e4_19_mcts_best_varpen.out 2>&1
+    # python -u main.py "../instances/constraints_17_c_100000_2_2_0_final.simp" -d 1 -m 136 -o "test.cubes" -prod
 
     start_time_tool = time.time()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", help="filename of the CNF file", type=str)
-    parser.add_argument("-order", help="KS order", type=int)
+    # parser.add_argument("-order", help="KS order", type=int)
     parser.add_argument("-n", help="cutoff when n variables are eliminated", type=int, default=-1)
     parser.add_argument("-d", help="cutoff when d depth is reached", type=int, default=-1)
     parser.add_argument("-m", help="only top m variables to be considered for cubing", type=int)

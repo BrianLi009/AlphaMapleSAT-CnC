@@ -14,13 +14,12 @@ pysat_propagate_obj = None
 
 class Board:
 
-    def __init__(self, args, cnf, edge_dict, pysat_propagate):
+    def __init__(self, args, cnf, pysat_propagate):
         self.args = args
         # self.cnf_clauses_org = copy.deepcopy(cnf.clauses)
         # self.cnf = copy.deepcopy(cnf)
         self.nlits = cnf.nv # number of variables in the CNF formula
         self.extra_lits = list(range(self.args.MAX_LITERALS+1, self.nlits+1, 1))+list(range(-self.args.MAX_LITERALS-1, -self.nlits-1, -1)) # extra lits not part of the action space
-        self.edge_dict = edge_dict
 
         self.arena_mode = 0 # 0: normal mode, 1: arena mode
         self.step = 0

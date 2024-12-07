@@ -26,32 +26,12 @@ class KSGame(Game):
         super(KSGame, self).__init__()
         self.args = args
         self.cnf = CNF(from_file=filename)
-        self.order = args.order
         self.MAX_LITERALS = args.MAX_LITERALS
         self.STATE_SIZE = args.STATE_SIZE
-        print("Solving the KS system of order ", self.order, " with ", len(self.cnf.clauses), " constraints")
 
         self.log_sat_asgn = []
         self.log_giveup_rew, self.log_giveup_rewA = [], []
         self.log_eval_var, self.log_eval_varA = [], []
-
-        self.edge_dict = {}
-        # self.tri_dict = {}
-        count = 0
-        for j in range(1, self.order+1):             #generating the edge variables
-            for i in range(1, self.order+1):
-                if i < j:
-                    count += 1
-                    self.edge_dict[(i,j)] = count
-
-        self.edge_count = count
-        assert self.MAX_LITERALS >= count # sanity check so that we can encode the edge variables in the action space
-
-        # for a in range(1, order-1):             #generating the triangle variables
-        #     for b in range(a+1, order):
-        #         for c in range(b+1, order+1):
-        #             count += 1
-        #             self.tri_dict[(a,b,c)] = count
 
         self.pysat_propagate = MarchPysatPropagate(cnf=self.cnf, m=self.MAX_LITERALS)
 
@@ -61,10 +41,10 @@ class KSGame(Game):
                 max_metric_val = self.args.VARS_TO_ELIM**2
             else:
                 max_metric_val = (self.args.m // 4)**2 # crude estimate of the maximum metric value (TODO: improve this)
-            board = BoardMode0(args=self.args, cnf=self.cnf, edge_dict=self.edge_dict, max_metric_val=max_metric_val, pysat_propagate=self.pysat_propagate)
+            board = BoardMode0(args=self.args, cnf=self.cnf, max_metric_val=max_metric_val, pysat_propagate=self.pysat_propagate)
             board.calculate_march_metrics() # initialize the valid literals, prob, and march_var_score_dict
             return board
-        return Board(args=self.args, cnf=self.cnf, edge_dict=self.edge_dict, pysat_propagate=self.pysat_propagate)
+        return Board(args=self.args, cnf=self.cnf, pysat_propagate=self.pysat_propagate)
 
     def get_copy(self):
         return self # copy.deepcopy(self) # TODO: check if deepcopy is required
@@ -209,21 +189,21 @@ class KSGame(Game):
         return str(board.prior_actions)
         # return calculate_hash(''.join(map(str, board.get_state_complete()))) # slow
     
-    def triu2adj(self, board_triu): 
-        assert len(board_triu) == self.order*(self.order-1)//2
-        adj_matrix = np.zeros((self.order, self.order), dtype=int)
-        i = np.triu_indices(self.order, k=1) # k=1 to exclude the diagonal
-        col_wise_sort = i[1].argsort()
-        i_new = (i[0][col_wise_sort], i[1][col_wise_sort])
-        adj_matrix[i_new] = board_triu
-        return adj_matrix
+    # def triu2adj(self, board_triu): 
+    #     assert len(board_triu) == self.MAX_LITERALS
+    #     adj_matrix = np.zeros((self.order, self.order), dtype=int)
+    #     i = np.triu_indices(self.order, k=1) # k=1 to exclude the diagonal
+    #     col_wise_sort = i[1].argsort()
+    #     i_new = (i[0][col_wise_sort], i[1][col_wise_sort])
+    #     adj_matrix[i_new] = board_triu
+    #     return adj_matrix
 
-    def print_graph(self, adj_matrix):
-        G = nx.from_numpy_array(adj_matrix)
-        nx.draw(G, with_labels=True, labels={k:k+1 for k in range(self.order)})
-        plt.tight_layout()
-        plt.savefig("Graph.png", format="PNG")
-        wandb.log({"example sat": wandb.Image("Graph.png")})
+    # def print_graph(self, adj_matrix):
+    #     G = nx.from_numpy_array(adj_matrix)
+    #     nx.draw(G, with_labels=True, labels={k:k+1 for k in range(self.order)})
+    #     plt.tight_layout()
+    #     plt.savefig("Graph.png", format="PNG")
+    #     wandb.log({"example sat": wandb.Image("Graph.png")})
 
 # from pysat.solvers import Solver
 # from pysat.formula import CNF
