@@ -12,13 +12,14 @@ cd "$1" || exit
 # Initialize variables
 solving_time=0
 verification_time=0
-num_cubes=0
+leaf_cubes=0
+total_cubes=0
 
 # Compute Solving Time and Verification Time together
 while IFS= read -r file; do
     if [[ "$file" == *.log ]]; then
-        # Count as a cube file
-        ((num_cubes++))
+        # Count as a leaf cube file
+        ((leaf_cubes++))
         # Add to solving time
         time=$(grep "CPU time" "$file" | awk '{total += $(NF-1)} END {print total}')
         solving_time=$(echo "$solving_time + $time" | bc)
@@ -28,6 +29,9 @@ while IFS= read -r file; do
         verification_time=$(echo "$verification_time + $time" | bc)
     fi
 done < <(find . -type f \( -name "*.log" -o -name "*.verify" \))
+
+# Count total cubes (all nodes) using simplog files
+total_cubes=$(find . -name "*.simplog" | wc -l)
 
 # Compute Cubing Time
 cubing_time=$(grep 'Tool runtime' slurm-*.out | awk '{sum += $3} END {print sum}')
@@ -40,4 +44,5 @@ echo "Solving Time: $solving_time"
 echo "Cubing Time: $cubing_time"
 echo "Simp Time: $simp_time"
 echo "Verification Time: $verification_time seconds"
-echo "# of Cubes: $num_cubes"
+echo "# of Leaf Cubes: $leaf_cubes"
+echo "# of Total Cubes: $total_cubes"
