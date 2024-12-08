@@ -33,8 +33,12 @@ done < <(find . -type f \( -name "*.log" -o -name "*.verify" \))
 # Count total cubes (all nodes) using simplog files
 total_cubes=$(find . -name "*.simplog" | wc -l)
 
-# Compute Cubing Time
-cubing_time=$(grep 'Tool runtime' slurm-*.out | awk '{sum += $3} END {print sum}')
+# Compute Cubing Time - check both "Tool runtime" and "c time" formats
+cubing_time=$(grep -E 'Tool runtime|c time = ' slurm-*.out | awk '
+    /Tool runtime/ {sum += $3}
+    /c time = / {sum += $4}
+    END {print sum}
+')
 
 # Compute Simp Time
 simp_time=$(grep 'c total process time since initialization:' *.simplog | awk '{SUM += $(NF-1)} END {print SUM}' | bc)
