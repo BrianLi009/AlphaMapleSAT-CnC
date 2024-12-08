@@ -78,8 +78,6 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
         file_to_cube = f"{cube}{index}.cnf.simp"
         simplog_file = f"{cube}{index}.cnf.simplog"
         file_to_check = f"{cube}{index}.cnf.ext"
-        # Remove the cube file after it's been used
-        remove_related_files([cube])
     else:
         if solving_mode_g == "satcas":
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -cas"
@@ -89,6 +87,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
         simplog_file = f"{original_file}.simplog"
         file_to_check = f"{original_file}.ext"
     subprocess.run(command, shell=True)
+    # Remove the cube file after it's been used
+    remove_related_files([cube])
 
     # Check if the output contains "c exit 20"
     with open(simplog_file, "r") as file:
