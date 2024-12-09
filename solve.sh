@@ -31,7 +31,7 @@ if [ "$solver" = "-cadical" ]; then
     fi
 elif [ "$solver" = "-maplesat" ]; then
     if [ "$mode" = "-cas" ]; then
-        timeout $t ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause | tee $f.log
+        timeout $t ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause -exhaustive=$f.exhaust | tee $f.log
     else
         timeout $t ./maplesat-ks/simp/maplesat_static $f -no-pre -minclause | tee $f.log
     fi
