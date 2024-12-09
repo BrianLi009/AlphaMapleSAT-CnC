@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Check if a directory name was provided
-if [ $# -eq 0 ]; then
-  echo "Usage: $0 <directory-name>"
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 <directory-name> <timeout>"
   exit 1
 fi
 
@@ -14,15 +14,26 @@ solving_time=0
 verification_time=0
 leaf_cubes=0
 total_cubes=0
+timeouted_cubes=0
+
+# Read the timeout parameter
+timeout=$2
 
 # Compute Solving Time and Verification Time together
 while IFS= read -r file; do
     if [[ "$file" == *.log ]]; then
         # Count as a leaf cube file
         ((leaf_cubes++))
-        # Add to solving time
-        time=$(grep "CPU time" "$file" | awk '{total += $(NF-1)} END {print total}')
-        solving_time=$(echo "$solving_time + $time" | bc)
+        
+        # Check for CPU time in the file
+        if grep -q "CPU time" "$file"; then
+            # Add to solving time
+            time=$(grep "CPU time" "$file" | awk '{total += $(NF-1)} END {print total}')
+            solving_time=$(echo "$solving_time + $time" | bc)
+        else
+            # Count as a timeouted cube and add CPU time as 0
+            ((timeouted_cubes++))
+        fi
     elif [[ "$file" == *.verify ]]; then
         # Add to verification time
         time=$(grep 'c verification time:' "$file" | awk '{sum += $4} END {print sum}')
@@ -50,3 +61,8 @@ echo "Simp Time: $simp_time"
 echo "Verification Time: $verification_time seconds"
 echo "# of Leaf Cubes: $leaf_cubes"
 echo "# of Total Cubes: $total_cubes"
+echo "# of Timeouted Cubes: $timeouted_cubes"
+
+# Compute and output solving time including timeouts
+solving_time_with_timeout=$(echo "$solving_time + $timeouted_cubes * $timeout" | bc)
+echo "Solving Time (including timeout): $solving_time_with_timeout"
