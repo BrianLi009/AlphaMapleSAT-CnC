@@ -1,8 +1,9 @@
-(ams_env) [zhengyu@beluga3 AlphaMapleSAT2]$ ./summary.sh ks19m
-Solving Time: 897.629515
-Cubing Time: 4720.91
-Simp Time: 11447.8
+Solving Time: 3554.818007
+Cubing Time: 6386.04
+Simp Time: 11108
 Verification Time: 0 seconds
-# of Leaf Cubes: 20
-# of Total Cubes: 3682
-Wall Clock Time: 00:27:27
+# of Leaf Cubes: 712
+# of Total Cubes: 2352
+# of Timeouted Cubes: 5
+Solving Time (including timeout): 3854.818007
+Wall Clock Time: 00:29:36
