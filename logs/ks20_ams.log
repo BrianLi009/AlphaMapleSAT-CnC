@@ -1,7 +1,10 @@
-Solving Time: 5477.093915
-Cubing Time: 137852
-Simp Time: 329360
+[zhengyu@beluga1 AlphaMapleSAT2]$ ./summary.sh ks20 600
+Solving Time: 13915.109477
+Cubing Time: 10037.2
+Simp Time: 18508.2
 Verification Time: 0 seconds
-# of Leaf Cubes: 2713
-# of Total Cubes: 69975
-Wall Clock Time: 09:45:32
+# of Leaf Cubes: 759
+# of Total Cubes: 2075
+# of Timeouted Cubes: 4
+Solving Time (including timeout): 16315.109477
+Wall Clock Time: 01:11:24
