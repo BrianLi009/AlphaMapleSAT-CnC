@@ -3,7 +3,6 @@ import time
 import os
 
 import coloredlogs
-from matplotlib import pyplot as plt
 
 from Coach import Coach
 
