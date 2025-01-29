@@ -6,7 +6,6 @@ import time
 from collections import deque
 from pickle import Pickler, Unpickler
 from random import shuffle
-from matplotlib import pyplot as plt
 
 import numpy as np
 from tqdm import tqdm
