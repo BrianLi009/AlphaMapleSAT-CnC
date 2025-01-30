@@ -88,7 +88,7 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
         file_to_check = f"{original_file}.ext"
     subprocess.run(command, shell=True)
     # Remove the cube file after it's been used
-    remove_related_files([cube])
+    #remove_related_files([cube])
 
     # Check if the output contains "c exit 20"
     with open(simplog_file, "r") as file:
@@ -96,7 +96,7 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             print("the cube is UNSAT")
             if cube != "N":
                 files_to_remove = [f'{cube}{index}.cnf', file_to_cube, file_to_check]
-                remove_related_files(files_to_remove)
+                #remove_related_files(files_to_remove)
             return
     
     command = f"sed -E 's/.* 0 [-]*([0-9]*) 0$/\\1/' < {file_to_check} | awk '$0<={m}' | sort | uniq | wc -l"
