@@ -116,9 +116,9 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                 files_to_remove = [f'{cube}{index}.cnf']
                 remove_related_files(files_to_remove)
                 if solving_mode_g == "satcas":
-                    command = f"./solve.sh {order} -maplesat {timeout_g} -cas {file_to_cube}"
+                    command = f"./solve.sh {order} -cadical {timeout_g} -cas {file_to_cube}"
                 else:
-                    command = f"./solve.sh {order} -maplesat {timeout_g} {file_to_cube}"
+                    command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
             return
     if cutoff == 'v':
@@ -127,9 +127,9 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                 files_to_remove = [f'{cube}{index}.cnf']
                 remove_related_files(files_to_remove)
                 if solving_mode_g == "satcas":
-                    command = f"./solve.sh {order} -maplesat {timeout_g} -cas {file_to_cube}"
+                    command = f"./solve.sh {order} -cadical {timeout_g} -cas {file_to_cube}"
                 else:
-                    command = f"./solve.sh {order} -maplesat {timeout_g} {file_to_cube}"
+                    command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
             return
 
@@ -222,9 +222,9 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
             instance_lst = [first_line] + [line.strip() for line in file]
             for instance in instance_lst:
                 if solving_mode_g == "satcas":
-                    command = f"./solve.sh {order} -maplesat {timeout_g} -cas {instance}"
+                    command = f"./solve.sh {order} -cadical {timeout_g} -cas {instance}"
                 else:
-                    command = f"./solve.sh {order} -maplesat {timeout_g} {instance}"
+                    command = f"./solve.sh {order} -cadical {timeout_g} {instance}"
                 queue.put(command)
 
     # Wait for all tasks to be completed
