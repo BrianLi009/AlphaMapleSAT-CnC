@@ -25,15 +25,15 @@ Arguments:
 # Select solver based on arguments
 if [ "$solver" = "-cadical" ]; then
     if [ "$mode" = "-cas" ]; then
-        timeout $t ./cadical-ks/build/cadical-ks $f --order $n | tee $f.log
+        timeout $t ./cadical-ks/build/cadical-ks $f --order $n --proofsize 7168 | tee $f.log
     else
-        timeout $t ./cadical-ks/build/cadical-ks $f | tee $f.log
+        timeout $t ./cadical-ks/build/cadical-ks $f --proofsize 7168 | tee $f.log
     fi
 elif [ "$solver" = "-maplesat" ]; then
     if [ "$mode" = "-cas" ]; then
-        timeout $t ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause -exhaustive=$f.exhaust | tee $f.log
+        timeout $t ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause -exhaustive=$f.exhaust -max-proof-size=7168 | tee $f.log
     else
-        timeout $t ./maplesat-ks/simp/maplesat_static $f -no-pre -minclause | tee $f.log
+        timeout $t ./maplesat-ks/simp/maplesat_static $f -no-pre -max-proof-size=7168 | tee $f.log
     fi
 else
     echo "Invalid solver option. Use -cadical or -maplesat"
