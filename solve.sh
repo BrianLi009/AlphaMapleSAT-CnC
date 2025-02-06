@@ -4,8 +4,13 @@
 n=$1      #order
 solver=$2  #solver type
 t=$3      #timeout in seconds
-mode=$4    #solver mode (optional)
-f=$5      #instance file name (moved to last)
+f=$4      #instance file name (if no mode provided)
+
+# Check if 5th parameter exists - if so, f is 5th param and mode is 4th
+if [ $# -eq 5 ]; then
+    mode=$4    #solver mode
+    f=$5      #instance file name
+fi
 
 [ "$1" = "-h" -o "$1" = "--help" -o "$#" -lt 4 ] && echo "
 Description:
