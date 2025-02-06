@@ -164,7 +164,7 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     queue.put(command1)
     queue.put(command2)
 
-def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", numMCTS=2, cutoff='d', cutoffv=5, solveaftercube='True', timeout=3600):
+def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", numMCTS=2, cutoff='d', cutoffv=5, solveaftercube='True', timeout=2147483647):
     """
     Parameters:
     - order: the order of the graph (required for satcas mode)
