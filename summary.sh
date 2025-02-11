@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Check if a directory name was provided
-if [ $# -lt 2 ]; then
-  echo "Usage: $0 <directory-name> <timeout>"
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <directory-name>"
   exit 1
 fi
 
@@ -87,7 +87,3 @@ echo "Unknown Time: $unknown_time"
 echo "Cubing Time: $cubing_time"
 echo "Simp Time: $simp_time"
 echo "Verification Time: $verification_time seconds"
-
-# Compute and output solving time including timeouts
-solving_time_with_timeout=$(echo "$solving_time + $timeouted_cubes * $timeout" | bc)
-echo "Solving Time (including timeout): $solving_time_with_timeout"
