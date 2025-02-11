@@ -23,6 +23,9 @@ def run_command(command):
             print("solved")
             # remove_related_files(file_to_cube)
             process.terminate()
+        elif "SAT" in stdout.decode():
+            print("solved")
+            process.terminate()
         else:
             print("Continue cubing this subproblem...")
             command = f"cube('{file_to_cube}', 'N', 0, {mg}, '{orderg}', {numMCTSg}, queue, '{cutoffg}', {cutoffvg}, {dg}, 'True')"
