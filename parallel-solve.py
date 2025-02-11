@@ -8,7 +8,7 @@ remove_file = True
 
 def run_command(command):
     process_id = os.getpid()
-    print(f"Process {process_id}: Executing command: {command}")
+    print(f"Process {process_id}: Executing command: {command}", flush=True)
 
     file_to_cube = command.split()[-1]
 
@@ -17,25 +17,25 @@ def run_command(command):
         stdout, stderr = process.communicate()
 
         if stderr:
-            print(f"Error executing command: {stderr.decode()}")
+            print(f"Error executing command: {stderr.decode()}", flush=True)
 
         if "UNSAT" in stdout.decode():
-            print("solved")
+            print("solved", flush=True)
             # remove_related_files(file_to_cube)
             process.terminate()
         elif "SAT" in stdout.decode():
-            print("solved")
+            print("solved", flush=True)
             process.terminate()
         else:
-            print("Continue cubing this subproblem...")
+            print("Continue cubing this subproblem...", flush=True)
             command = f"cube('{file_to_cube}', 'N', 0, {mg}, '{orderg}', {numMCTSg}, queue, '{cutoffg}', {cutoffvg}, {dg}, 'True')"
             queue.put(command)
 
     except Exception as e:
-        print(f"Failed to run command due to: {str(e)}")
+        print(f"Failed to run command due to: {str(e)}", flush=True)
 
 def run_cube_command(command):
-    print (command)
+    print(command, flush=True)
     eval(command)
 
 def remove_related_files(files_to_remove):
@@ -46,9 +46,9 @@ def remove_related_files(files_to_remove):
     for file in files_to_remove:
         try:
             os.remove(file)
-            print(f"Removed: {file}")
+            print(f"Removed: {file}", flush=True)
         except OSError as e:
-            print(f"Error: {e.strerror}. File: {file}")
+            print(f"Error: {e.strerror}. File: {file}", flush=True)
 
 def rename_file(filename):
     # Remove .simp from file name
@@ -96,7 +96,7 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     # Check if the output contains "c exit 20"
     with open(simplog_file, "r") as file:
         if "c exit 20" in file.read():
-            print("the cube is UNSAT")
+            print("the cube is UNSAT", flush=True)
             if cube != "N":
                 files_to_remove = [f'{cube}{index}.cnf', file_to_cube, file_to_check]
                 #remove_related_files(files_to_remove)
@@ -111,7 +111,7 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
         else:
             cutoffv = cutoffv + 5
 
-    print (f'{var_removed} variables removed from the cube')
+    print(f'{var_removed} variables removed from the cube', flush=True)
 
     if cutoff == 'd':
         if d >= cutoffv:
@@ -217,10 +217,10 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
 
         # Check if the first line starts with 'p cnf'
         if first_line.startswith('p cnf'):
-            print("input file is a CNF file")
+            print("input file is a CNF file", flush=True)
             cube(file_name_solve, "N", 0, m, order, numMCTS, queue, cutoff, cutoffv, d)
         else:
-            print("input file contains name of multiple CNF file, solving them first")
+            print("input file contains name of multiple CNF file, solving them first", flush=True)
             # Prepend the already read first line to the list of subsequent lines
             instance_lst = [first_line] + [line.strip() for line in file]
             for instance in instance_lst:
