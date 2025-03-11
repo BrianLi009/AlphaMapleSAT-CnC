@@ -13,6 +13,7 @@
 #include <algorithm>
 
 #include "symbreak.hpp"
+#include "exhaustive.hpp"
 
 /*------------------------------------------------------------------------*/
 
@@ -347,6 +348,7 @@ int App::main (int argc, char **argv) {
 
   int order = 0;
   int unembeddable_check = 0;
+  bool use_exhaustive = false;  // Flag to determine which search method to use
 
   // Handle options which lead to immediate exit first.
 
@@ -518,6 +520,9 @@ int App::main (int argc, char **argv) {
         order = stoi(argv[i]);
         std::cout << "c order = " << order << endl;
       }
+    } else if (!strcmp (argv[i], "--exhaustive")) {
+      use_exhaustive = true;
+      std::cout << "c Using exhaustive search mode" << std::endl;
     } else if (!strcmp (argv[i], "--unembeddable-check")) {
       if (++i == argc)
         APPERR ("argument to '--unembeddable-check' missing");
@@ -906,12 +911,24 @@ int App::main (int argc, char **argv) {
   } else {
     solver->section ("solving");
 
-    SymmetryBreaker se(solver, order, unembeddable_check);
-
-    max_var = solver->active ();
-    //std::cout << "c Nof vars: " << max_var << std::endl;
-
-    res = solver->solve ();
+    // Choose between SymmetryBreaker and ExhaustiveSearch based on the flag
+    if (use_exhaustive) {
+      if (order > 0) {
+        ExhaustiveSearch es(solver, order);
+        max_var = solver->active ();
+        res = solver->solve ();
+      } else {
+        std::cout << "c Error: Order must be specified for exhaustive search" << std::endl;
+        return 1;
+      }
+    } else if (order > 0) {
+      SymmetryBreaker se(solver, order, unembeddable_check);
+      max_var = solver->active ();
+      res = solver->solve ();
+    } else {
+      max_var = solver->active ();
+      res = solver->solve ();
+    }
   }
 
   if (solver->proof_specified) {
