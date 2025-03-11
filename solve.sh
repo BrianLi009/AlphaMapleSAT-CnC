@@ -23,7 +23,7 @@ Arguments:
     <n>: the order of the instance/number of vertices in the graph
     <solver>: -cadical or -maplesat
     <t>: timeout in seconds
-    [mode]: -cas (optional)
+    [mode]: -cas or -exhaustive-no-cas (optional)
     <f>: file name of the CNF instance to be solved
 " && exit
 
@@ -31,6 +31,8 @@ Arguments:
 if [ "$solver" = "-cadical" ]; then
     if [ "$mode" = "-cas" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --proofsize 7168 -t $t | tee $f.log
+    elif [ "$mode" = "-exhaustive-no-cas" ]; then
+        ./cadical-ks/build/cadical-ks $f --order $n --exhaustive --proofsize 7168 -t $t | tee $f.log
     else
         ./cadical-ks/build/cadical-ks $f --proofsize 7168 -t $t | tee $f.log
     fi

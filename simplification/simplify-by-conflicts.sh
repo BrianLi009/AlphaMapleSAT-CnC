@@ -1,31 +1,37 @@
 #!/bin/bash
 
-# Ensure parameters are specified on the command-line
+# Check if the correct number of arguments is provided
 if [ "$#" -lt 3 ]; then
-    echo "Usage: $0 filename order conflicts [-cas]"
-    echo "Need filename, order, and the number of conflicts for which to simplify"
+    echo "Usage: $0 <input_file> <order> <num_conflicts> [-cas|-exhaustive-no-cas]"
     exit 1
 fi
 
-f=$1 # Filename
-o=$2 # Order
-m=$3 # Number of conflicts
-mode=$4 # Optional -cas parameter
+input_file=$1
+order=$2
+num_conflicts=$3
+mode=""
 
-# Create necessary directories
-mkdir -p log
+# Check if a mode is specified
+if [ "$#" -eq 4 ]; then
+    mode=$4
+fi
 
-f_dir=$f
+# Create output file names
+output_file="${input_file}.simp"
+output_log="${input_file}.simplog"
+output_ext="${input_file}.ext"
 
-# Simplify for m conflicts
-echo "simplifying for $m conflicts"
-
+# Run the appropriate solver based on the mode
 if [ "$mode" = "-cas" ]; then
-    ./cadical-ks/build/cadical-ks "$f_dir" --order $o -o "$f_dir".simp1 -e "$f_dir".ext -n -c $m | tee "$f_dir".simplog
+    echo "Running simplification with CAS mode"
+    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
+elif [ "$mode" = "-exhaustive-no-cas" ]; then
+    echo "Running simplification with exhaustive search mode (no CAS)"
+    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" --exhaustive -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
 else
-    ./cadical-ks/build/cadical-ks "$f_dir" -o "$f_dir".simp1 -e "$f_dir".ext -n -c $m | tee "$f_dir".simplog
+    echo "Running standard simplification"
+    ./cadical-ks/build/cadical-ks "$input_file" -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
 fi
 
 # Output final simplified instance
-./gen_cubes/concat-edge.sh $o "$f_dir".simp1 "$f_dir".ext > "$f_dir".simp
-rm -f "$f_dir".simp1
+./gen_cubes/concat-edge.sh $order "$output_file" "$output_ext" > "$output_file"
