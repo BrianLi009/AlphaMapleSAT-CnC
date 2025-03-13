@@ -19,11 +19,11 @@ def run_command(command):
         if stderr:
             print(f"Error executing command: {stderr.decode()}", flush=True)
 
-        if "UNSAT" in stdout.decode():
+        if "UNSATISFIABLE" in stdout.decode():
             print("solved", flush=True)
             # remove_related_files(file_to_cube)
             process.terminate()
-        elif "SAT" in stdout.decode():
+        elif "SATISFIABLE" in stdout.decode():
             print("solved", flush=True)
             process.terminate()
         else:
