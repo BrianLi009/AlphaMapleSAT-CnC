@@ -47,9 +47,9 @@ while IFS= read -r file; do
             solving_time=$(echo "$solving_time + $time" | bc)
             
             # Categorize time based on SAT/UNSAT/Unknown
-            if grep -q "UNSAT" "$file"; then
+            if grep -q "UNSATISFIABLE" "$file"; then
                 unsat_time=$(echo "$unsat_time + $time" | bc)
-            elif grep -q "SAT" "$file"; then
+            elif grep -q "SATISFIABLE" "$file"; then
                 sat_time=$(echo "$sat_time + $time" | bc)
             else
                 unknown_time=$(echo "$unknown_time + $time" | bc)
