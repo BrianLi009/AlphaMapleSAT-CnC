@@ -29,7 +29,7 @@ if [ "$mode" = "-cas" ]; then
     ./gen_cubes/concat-edge.sh $order "$output_file" "$output_ext" > "$output_file"
 elif [ "$mode" = "-exhaustive-no-cas" ]; then
     echo "Running simplification with exhaustive search mode (no CAS)"
-    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" --exhaustive -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log
+    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" --exhaustive -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
     # Output final simplified instance
     ./gen_cubes/concat.sh "$output_file" "$output_ext" > "$output_file"
 else
