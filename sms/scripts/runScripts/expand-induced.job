@@ -1,0 +1,90 @@
+#!/bin/bash
+#$ -cwd
+#$ -V
+#$ -t 1-1384491:31
+#$ -r y
+#$ -l mem_free=4G
+
+s=${1-17}
+i=${2-7}
+
+n=25
+r=$((n-s-i))
+
+chi=5
+
+d=$((chi-1))
+D=6
+
+case_id="n${n}_s${s}_i${i}_D${D}"
+
+
+encoding="../encodings/sat_colorExpansion.py"
+graphgen="../../src/build/graphgen"
+
+graphs_file_id=crit_tfree_n${s}_d$((chi-2))_D$((D-1))
+graphs_file=../${graphs_file_id}_wIS.txt
+total_graphs=$(wc -l < "$graphs_file")
+
+cnffile=$(mktemp)
+outfile=$(mktemp)
+
+enc_mainparams="-n $n -s $s -i $i"
+enc_shared_cfg="-d $d -D $D --removeAble --special4 $((i-1)) --basicCritical --subgraphMinDegree $((chi-2))"
+
+gg_mainparams="-v $n --cnf $cnffile --printStats --initialPartition $s $i $r --fixedSubgraphSize $s -chi $chi --allModels"  #--symClauses sym.cnf
+gg_mincheck_cfg="--cutoff 20000 --frequency 5"
+gg_clingo_cfg="--configuration=auto"
+
+begin=${SGE_TASK_ID-1}
+step=${SGE_TASK_STEPSIZE-20}
+last=${SGE_TASK_LAST-10000}
+end=$((begin + step - 1 <= last ? begin + step - 1 : last))
+end=$((total_graphs < end ? total_graphs : end))
+
+solfile="solutions_${case_id}.txt"
+timefile="times_${case_id}.txt"
+lockfile="lock.file"
+
+local_timefile=$(mktemp)
+local_solfile=$(mktemp)
+
+echo "temporary raw output file: $outfile"
+echo "temporary times file: $local_timefile"
+echo "temporary solutions file: $local_solfile"
+
+for ((task=begin; task<=end; task++)); do
+	echo "Attempting to expand graph no. $task from file $graphs_file" >> "$outfile"
+	echo -n "The graph: " >> "$outfile"
+	head -n $((p+1)) $graphs_file | tail -1 | cut -d';' -f1 >> "$outfile"
+
+	python3 $encoding $enc_mainparams $enc_cfg --graphFile "$graphs_file" --nGraph $((task-1)) > "$cnffile" 2> "$outfile" && {
+
+		# solve, collect data, lock a shared output log, write the data, release lock, remove temporary files and job out and err files
+
+		$graphgen $gg_mainparams $gg_mincheck_cfg --clingo $gg_clingo_cfg >> "$outfile"
+
+		enctime=$(grep -F 'Encoding time' "$outfile" | cut -d' ' -f3)
+		encstats=$(grep -F 'Clauses' "$outfile")
+		enccls=${encstats#Clauses: }
+		enccls=${enccls%,*}
+		encvars=${encstats##* }
+
+		clingonfig=$(grep -F 'configuration' "$outfile" | cut -d'=' -f2)
+		proptime=$(grep -F 'propagator' "$outfile" | cut -d' ' -f4)
+		mintime=$(grep -F 'minimality' "$outfile" | cut -d' ' -f5)
+		fullchecktime=$(grep -F 'full' "$outfile" | cut -d' ' -f6)
+		checkcalls=$(grep -F 'Calls of check' "$outfile" | cut -d' ' -f4)
+		propcalls=$(grep -F 'Calls propagator' "$outfile" | cut -d' ' -f3)
+		symconstraints=$(grep -F 'symmetry' "$outfile" | cut -d' ' -f6)
+		solvetime=$(grep -F 'Tot' "$outfile" | cut -d' ' -f3)
+
+		grep -FA1 Solution "$outfile" | grep -Fv Solution | sed "s/^/$task /" >> "$local_solfile"
+		echo "$task $enctime $enccls $encvars $solvetime $clingonfig $proptime $mintime $fullchecktime $checkcalls $propcalls $symconstraints" >> "$local_timefile"
+	}
+	echo $task done
+done
+
+flock "$lockfile" ./write_data.sh "$local_solfile" "$local_timefile" "$solfile" "$timefile"
+
+rm "$cnffile" "$outfile" "$local_solfile" "$local_timefile" $SGE_STDOUT_PATH $SGE_STDERR_PATH

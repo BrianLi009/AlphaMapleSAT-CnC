@@ -1,0 +1,7 @@
+Metadata-Version: 2.2
+Name: sms-graph-builder
+Version: 2024.11
+Summary: A package for building propositional encodings of graphs. Contains several pre-defined encodings, as well as the ability to specify user-defined constraints.
+Author-email: Markus Kirchweger <markus.kirchweger@ac.tuwien.ac.at>, Tomáš Peitl <peitl@ac.tuwien.ac.at>
+Keywords: graphs,propositional formula,encoding,SAT,CNF
+License-File: LICENSE
