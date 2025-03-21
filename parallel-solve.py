@@ -78,6 +78,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000 -cas"
         elif solving_mode_g == "exhaustive-no-cas":
             command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000 -exhaustive-no-cas"
+        elif solving_mode_g == "sms":
+            command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000 -sms"
         else:
             command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000"
         file_to_cube = f"{cube}{index}.cnf.simp"
@@ -88,6 +90,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -cas"
         elif solving_mode_g == "exhaustive-no-cas":
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -exhaustive-no-cas"
+        elif solving_mode_g == "sms":
+            command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -sms"
         else:
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000"
         file_to_cube = f"{original_file}.simp"
@@ -126,6 +130,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                     command = f"./solve.sh {order} -cadical {timeout_g} -cas {file_to_cube}"
                 elif solving_mode_g == "exhaustive-no-cas":
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {file_to_cube}"
+                elif solving_mode_g == "sms":
+                    command = f"./solve.sh {order} -cadical {timeout_g} -sms {file_to_cube}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
@@ -139,6 +145,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                     command = f"./solve.sh {order} -cadical {timeout_g} -cas {file_to_cube}"
                 elif solving_mode_g == "exhaustive-no-cas":
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {file_to_cube}"
+                elif solving_mode_g == "sms":
+                    command = f"./solve.sh {order} -cadical {timeout_g} -sms {file_to_cube}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
@@ -183,6 +191,7 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
     - m: number of variables to consider for cubing (required)
     - solving_mode: 'satcas' (cadical simplification with cas, maplesat solving with cas) 
                    or 'exhaustive-no-cas' (cadical with exhaustive search)
+                   or 'sms' (placeholder for SMS mode)
                    or 'other' (cadical simplification no cas, maplesat solving no cas)
     - cubing_mode: 'march' (use march_cu) or 'ams' (use alpha-zero-general)
     - numMCTS: number of MCTS simulations (only used with ams mode)
@@ -192,14 +201,14 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
     - timeout: timeout in seconds (default: 1 hour)
     """
     # Validate input parameters
-    if solving_mode not in ["satcas", "exhaustive-no-cas", "other"]:
-        raise ValueError("solving_mode must be one of 'satcas', 'exhaustive-no-cas', or 'other'")
+    if solving_mode not in ["satcas", "exhaustive-no-cas", "sms", "other"]:
+        raise ValueError("solving_mode must be one of 'satcas', 'exhaustive-no-cas', 'sms', or 'other'")
     if cubing_mode not in ["march", "ams"]:
         raise ValueError("cubing_mode must be either 'march' or 'ams'")
     if m is None:
         raise ValueError("m parameter must be specified")
-    if (solving_mode == "satcas" or solving_mode == "exhaustive-no-cas") and order is None:
-        raise ValueError("order parameter must be specified when using satcas or exhaustive-no-cas mode")
+    if (solving_mode == "satcas" or solving_mode == "exhaustive-no-cas" or solving_mode == "sms") and order is None:
+        raise ValueError("order parameter must be specified when using satcas, exhaustive-no-cas, or sms mode")
 
     d = 0
     cutoffv = int(cutoffv)
@@ -237,6 +246,8 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
                     command = f"./solve.sh {order} -cadical {timeout_g} -cas {instance}"
                 elif solving_mode_g == "exhaustive-no-cas":
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {instance}"
+                elif solving_mode_g == "sms":
+                    command = f"./solve.sh {order} -cadical {timeout_g} -sms {instance}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {instance}"
                 queue.put(command)
@@ -255,12 +266,12 @@ if __name__ == "__main__":
         epilog='Example usage: python3 parallel-solve.py 17 instances/ks_17.cnf -m 136 --solving-mode satcas --cubing-mode ams --timeout 7200'
     )
     parser.add_argument('order', type=int, nargs='?', default=None, 
-                        help='Order of the graph (required for satcas and exhaustive-no-cas modes)')
+                        help='Order of the graph (required for satcas, exhaustive-no-cas, and sms modes)')
     parser.add_argument('file_name_solve', help='Input file name')
     parser.add_argument('-m', type=int, required=True,
                         help='Number of variables to consider for cubing')
-    parser.add_argument('--solving-mode', choices=['satcas', 'exhaustive-no-cas', 'other'], default='other',
-                        help='Solving mode: satcas (cadical+cas), exhaustive-no-cas (cadical+exhaustive), or other (default)')
+    parser.add_argument('--solving-mode', choices=['satcas', 'exhaustive-no-cas', 'sms', 'other'], default='other',
+                        help='Solving mode: satcas (cadical+cas), exhaustive-no-cas (cadical+exhaustive), sms, or other (default)')
     parser.add_argument('--cubing-mode', choices=['march', 'ams'], default='march',
                         help='Cubing mode: march (default) or ams (alpha-zero-general)')
     parser.add_argument('--numMCTS', type=int, default=2,
@@ -277,8 +288,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Additional validation
-    if (args.solving_mode == "satcas" or args.solving_mode == "exhaustive-no-cas") and args.order is None:
-        parser.error("order parameter is required when using satcas or exhaustive-no-cas mode")
+    if (args.solving_mode == "satcas" or args.solving_mode == "exhaustive-no-cas" or args.solving_mode == "sms") and args.order is None:
+        parser.error("order parameter is required when using satcas, exhaustive-no-cas, or sms mode")
 
     main(args.order, args.file_name_solve, args.m, args.solving_mode, args.cubing_mode,
          args.numMCTS, args.cutoff, args.cutoffv, args.solveaftercube, args.timeout)

@@ -23,7 +23,7 @@ Arguments:
     <n>: the order of the instance/number of vertices in the graph
     <solver>: -cadical or -maplesat
     <t>: timeout in seconds
-    [mode]: -cas or -exhaustive-no-cas (optional)
+    [mode]: -cas or -exhaustive-no-cas or -sms (optional)
     <f>: file name of the CNF instance to be solved
 " && exit
 
@@ -33,12 +33,18 @@ if [ "$solver" = "-cadical" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --proofsize 7168 -t $t | tee $f.log
     elif [ "$mode" = "-exhaustive-no-cas" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --exhaustive --proofsize 7168 -t $t | tee $f.log
+    elif [ "$mode" = "-sms" ]; then
+        ./cadical-ks/build/cadical-ks $f --order $n --sms --proofsize 7168 -t $t | tee $f.log
     else
-        ./cadical-ks/build/cadical-ks $f --proofsize 7168 -t $t | tee $f.log
+        triangle_vars=$(( ($n * ($n - 1)) / 2 + 1 ))
+        smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f -t $t | tee $f.log
     fi
 elif [ "$solver" = "-maplesat" ]; then
     if [ "$mode" = "-cas" ]; then
         ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause -exhaustive=$f.exhaust -max-proof-size=7168 -cpu-lim=$t | tee $f.log
+    elif [ "$mode" = "-sms" ]; then
+        triangle_vars=$(( ($n * ($n - 1)) / 2 + 1 ))
+        smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f -t $t | tee $f.log
     else
         ./maplesat-ks/simp/maplesat_static $f -no-pre -max-proof-size=7168 -cpu-lim=$t | tee $f.log
     fi
