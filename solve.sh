@@ -35,7 +35,7 @@ if [ "$solver" = "-cadical" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --exhaustive --proofsize 7168 -t $t | tee $f.log
     elif [ "$mode" = "-sms" ]; then
         triangle_vars=$(( ($n * ($n - 1)) / 2 + 1 ))
-        smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f -t $t 2>&1 | tee $f.log
+        smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f --timeout $t 2>&1 | tee $f.log
     else
         ./cadical-ks/build/cadical-ks $f --proofsize 7168 -t $t | tee $f.log
     fi
@@ -44,7 +44,7 @@ elif [ "$solver" = "-maplesat" ]; then
         ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause -exhaustive=$f.exhaust -max-proof-size=7168 -cpu-lim=$t | tee $f.log
     elif [ "$mode" = "-sms" ]; then
         triangle_vars=$(( ($n * ($n - 1)) / 2 + 1 ))
-        smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f -t $t 2>&1 | tee $f.log
+        smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f --timeout $t 2>&1 | tee $f.log
     else
         ./maplesat-ks/simp/maplesat_static $f -no-pre -max-proof-size=7168 -cpu-lim=$t | tee $f.log
     fi
