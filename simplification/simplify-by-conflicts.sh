@@ -35,7 +35,9 @@ elif [ "$mode" = "-exhaustive-no-cas" ]; then
 elif [ "$mode" = "-sms" ]; then
     echo "Running simplification with SMS mode"
     triangle_vars=$(( ($order * ($order - 1)) / 2 + 1 ))
-    smsg --vertices $order --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs "$input_file" --assignment-cutoff-prerun-time 30 --learned-clauses "${input_file}_learned.dimacs" 2>&1 | tee "$output_log"
+    sms_cmd="smsg --vertices $order --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs \"$input_file\" --assignment-cutoff-prerun-time 30 --learned-clauses \"${input_file}_learned.dimacs\""
+    echo "Executing command: $sms_cmd" | tee "$output_log"
+    smsg --vertices $order --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs "$input_file" --assignment-cutoff-prerun-time 30 --learned-clauses "${input_file}_learned.dimacs" 2>&1 | tee -a "$output_log"
     cat "$input_file" "${input_file}_learned.dimacs" > "$output_file"
 else
     echo "Running standard simplification"
