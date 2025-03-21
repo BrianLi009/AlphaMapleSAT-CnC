@@ -15,15 +15,20 @@ def run_command(command):
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout, stderr = process.communicate()
+        stdout_str = stdout.decode()
 
         if stderr:
             print(f"Error executing command: {stderr.decode()}", flush=True)
 
-        if "UNSATISFIABLE" in stdout.decode():
+        # Check for SMS mode completion
+        if solving_mode_g == "sms" and "Search finished" in stdout_str:
             print("solved", flush=True)
-            # remove_related_files(file_to_cube)
             process.terminate()
-        elif "SATISFIABLE" in stdout.decode():
+        # Check for SAT solver completion
+        elif "UNSATISFIABLE" in stdout_str:
+            print("solved", flush=True)
+            process.terminate()
+        elif "SATISFIABLE" in stdout_str:
             print("solved", flush=True)
             process.terminate()
         else:
