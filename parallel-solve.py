@@ -21,7 +21,7 @@ def run_command(command):
             print(f"Error executing command: {stderr.decode()}", flush=True)
 
         # Check for SMS mode completion
-        if solving_mode_g == "sms" and "Search finished" in stdout_str:
+        if (solving_mode_g == "sms" or solving_mode_g == "smsd2") and "Search finished" in stdout_str:
             print("solved", flush=True)
             process.terminate()
         # Check for SAT solver completion
