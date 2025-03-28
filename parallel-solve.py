@@ -303,8 +303,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Additional validation
-    if (args.solving_mode == "satcas" or args.solving_mode == "exhaustive-no-cas" or args.solving_mode == "sms") and args.order is None:
-        parser.error("order parameter is required when using satcas, exhaustive-no-cas, or sms mode")
+    if (args.solving_mode == "satcas" or args.solving_mode == "exhaustive-no-cas" or args.solving_mode == "sms" or args.solving_mode == "smsd2") and args.order is None:
+        parser.error("order parameter is required when using satcas, exhaustive-no-cas, sms, or smsd2 mode")
 
     main(args.order, args.file_name_solve, args.m, args.solving_mode, args.cubing_mode,
          args.numMCTS, args.cutoff, args.cutoffv, args.solveaftercube, args.timeout)
