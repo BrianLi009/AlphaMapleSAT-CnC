@@ -285,8 +285,8 @@ if __name__ == "__main__":
     parser.add_argument('file_name_solve', help='Input file name')
     parser.add_argument('-m', type=int, required=True,
                         help='Number of variables to consider for cubing')
-    parser.add_argument('--solving-mode', choices=['satcas', 'exhaustive-no-cas', 'sms', 'other'], default='other',
-                        help='Solving mode: satcas (cadical+cas), exhaustive-no-cas (cadical+exhaustive), sms, or other (default)')
+    parser.add_argument('--solving-mode', choices=['satcas', 'exhaustive-no-cas', 'sms', 'smsd2', 'other'], default='other',
+                        help='Solving mode: satcas (cadical+cas), exhaustive-no-cas (cadical+exhaustive), sms, smsd2, or other (default)')
     parser.add_argument('--cubing-mode', choices=['march', 'ams'], default='march',
                         help='Cubing mode: march (default) or ams (alpha-zero-general)')
     parser.add_argument('--numMCTS', type=int, default=2,
