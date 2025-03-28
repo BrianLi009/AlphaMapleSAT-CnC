@@ -35,13 +35,13 @@ if [ "$solver" = "-cadical" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --exhaustive --proofsize 7168 -t $t | tee $f.log
     elif [ "$mode" = "-sms" ]; then
         triangle_vars=$(( ($n * ($n - 1)) / 2 + 1 ))
-        sms_cmd="timeout $t smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f"
+        sms_cmd="timeout 1000000 smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f"
         echo "Executing command: $sms_cmd" | tee $f.log
-        timeout $t smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f 2>&1 | tee -a $f.log
+        timeout 1000000 smsg --vertices $n --print-stats True --triangle-vars $triangle_vars --non010 --all-graphs --dimacs $f 2>&1 | tee -a $f.log
     elif [ "$mode" = "-smsd2" ]; then
-        sms_cmd="timeout $t smsg -v $n --all-graphs --dimacs $f"
+        sms_cmd="timeout 1000000 smsg -v $n --all-graphs --dimacs $f"
         echo "Executing command: $sms_cmd" | tee $f.log
-        timeout $t smsg -v $n --all-graphs --dimacs $f 2>&1 | tee -a $f.log
+        timeout 1000000 smsg -v $n --all-graphs --dimacs $f 2>&1 | tee -a $f.log
     else
         ./cadical-ks/build/cadical-ks $f --proofsize 7168 -t $t | tee $f.log
     fi
