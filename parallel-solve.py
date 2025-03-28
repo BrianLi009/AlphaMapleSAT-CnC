@@ -85,6 +85,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000 -exhaustive-no-cas"
         elif solving_mode_g == "sms":
             command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000 -sms"
+        elif solving_mode_g == "smsd2":
+            command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000 -smsd2"
         else:
             command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf && ./simplification/simplify-by-conflicts.sh {cube}{index}.cnf {order} 10000"
         file_to_cube = f"{cube}{index}.cnf.simp"
@@ -97,6 +99,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -exhaustive-no-cas"
         elif solving_mode_g == "sms":
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -sms"
+        elif solving_mode_g == "smsd2":
+            command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000 -smsd2"
         else:
             command = f"./simplification/simplify-by-conflicts.sh {original_file} {order} 10000"
         file_to_cube = f"{original_file}.simp"
@@ -137,6 +141,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {file_to_cube}"
                 elif solving_mode_g == "sms":
                     command = f"./solve.sh {order} -cadical {timeout_g} -sms {file_to_cube}"
+                elif solving_mode_g == "smsd2":
+                    command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {file_to_cube}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
@@ -152,6 +158,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {file_to_cube}"
                 elif solving_mode_g == "sms":
                     command = f"./solve.sh {order} -cadical {timeout_g} -sms {file_to_cube}"
+                elif solving_mode_g == "smsd2":
+                    command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {file_to_cube}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
@@ -253,6 +261,8 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {instance}"
                 elif solving_mode_g == "sms":
                     command = f"./solve.sh {order} -cadical {timeout_g} -sms {instance}"
+                elif solving_mode_g == "smsd2":
+                    command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {instance}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {instance}"
                 queue.put(command)
