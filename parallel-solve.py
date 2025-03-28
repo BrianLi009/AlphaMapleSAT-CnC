@@ -214,8 +214,8 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
     - timeout: timeout in seconds (default: 1 hour)
     """
     # Validate input parameters
-    if solving_mode not in ["satcas", "exhaustive-no-cas", "sms", "other"]:
-        raise ValueError("solving_mode must be one of 'satcas', 'exhaustive-no-cas', 'sms', or 'other'")
+    if solving_mode not in ["satcas", "exhaustive-no-cas", "sms", "smsd2", "other"]:
+        raise ValueError("solving_mode must be one of 'satcas', 'exhaustive-no-cas', 'sms', 'smsd2', or 'other'")
     if cubing_mode not in ["march", "ams"]:
         raise ValueError("cubing_mode must be either 'march' or 'ams'")
     if m is None:
