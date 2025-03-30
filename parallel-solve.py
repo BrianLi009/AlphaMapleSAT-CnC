@@ -140,9 +140,19 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                 elif solving_mode_g == "exhaustive-no-cas":
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {file_to_cube}"
                 elif solving_mode_g == "sms":
-                    command = f"./solve.sh {order} -cadical {timeout_g} -sms {file_to_cube}"
+                    if cube != "N":
+                        command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf"
+                        subprocess.run(command, shell=True)
+                        command = f"./solve.sh {order} -cadical {timeout_g} -sms {cube}{index}.cnf"
+                    else:
+                        command = f"./solve.sh {order} -cadical {timeout_g} -sms {original_file}"
                 elif solving_mode_g == "smsd2":
-                    command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {file_to_cube}"
+                    if cube != "N":
+                        command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf"
+                        subprocess.run(command, shell=True)
+                        command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {cube}{index}.cnf"
+                    else:
+                        command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {original_file}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
@@ -157,9 +167,19 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
                 elif solving_mode_g == "exhaustive-no-cas":
                     command = f"./solve.sh {order} -cadical {timeout_g} -exhaustive-no-cas {file_to_cube}"
                 elif solving_mode_g == "sms":
-                    command = f"./solve.sh {order} -cadical {timeout_g} -sms {file_to_cube}"
+                    if cube != "N":
+                        command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf"
+                        subprocess.run(command, shell=True)
+                        command = f"./solve.sh {order} -cadical {timeout_g} -sms {cube}{index}.cnf"
+                    else:
+                        command = f"./solve.sh {order} -cadical {timeout_g} -sms {original_file}"
                 elif solving_mode_g == "smsd2":
-                    command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {file_to_cube}"
+                    if cube != "N":
+                        command = f"./gen_cubes/apply.sh {original_file} {cube} {index} > {cube}{index}.cnf"
+                        subprocess.run(command, shell=True)
+                        command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {cube}{index}.cnf"
+                    else:
+                        command = f"./solve.sh {order} -cadical {timeout_g} -smsd2 {original_file}"
                 else:
                     command = f"./solve.sh {order} -cadical {timeout_g} {file_to_cube}"
                 queue.put(command)
