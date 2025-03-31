@@ -20,7 +20,6 @@ exptResults/
 *.simp
 arena_cubes.txt
 *.cubes
-*.cnf
 *.pkl
 
 ams_env/
