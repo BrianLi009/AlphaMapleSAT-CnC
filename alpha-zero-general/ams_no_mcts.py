@@ -7,6 +7,7 @@ import pickle
 from pysat.solvers import Solver
 from pysat.formula import CNF
 import time
+from collections import defaultdict
 
 class Node():
 
@@ -41,10 +42,11 @@ class Node():
     def get_next_node(self, var):
         return Node(self.prior_actions+[var], self.unsat_learnt_actions[:])
 
-    def valid_cubing_lits(self, literals_all): 
+    def valid_cubing_lits(self, literals_all, freevars_all): 
         negated_prior_actions = [-l for l in self.prior_actions]
         negated_unsat_learnt_actions = [-l for l in self.unsat_learnt_actions]
-        return list(set(literals_all) - set(self.prior_actions) - set(negated_prior_actions) - set(self.unsat_learnt_actions) - set(negated_unsat_learnt_actions))
+        # freevars = literals_all - non-free-vars
+        return list(set(freevars_all) - set(self.prior_actions) - set(negated_prior_actions) - set(self.unsat_learnt_actions) - set(negated_unsat_learnt_actions))
 
 
 class AmsNoMCTS():
@@ -73,11 +75,33 @@ class AmsNoMCTS():
             self.m = self.cnf.nv
         print(f"{m} variables will be considered for cubing")
 
+        BinaryImp = self.build_binary_implications(self.cnf.clauses)
+        freevars = self.construct_freevars(BinaryImp)
+        print(f"No. of free variables: {len(freevars)}")
+
         literals_pos = list(range(1, self.m+1))
         literals_neg = [-l for l in literals_pos]
-        self.literals_all = literals_pos + literals_neg
+        self.literals_all = literals_pos + literals_neg # we need this to always be the edge variables
+
+        # self.non_free_variables = set(range(1, self.m+1)) - set(freevars)
+        freevars_neg = [-l for l in freevars]
+        self.freevars_all = freevars + freevars_neg
 
         self.node_count = 0
+
+    def build_binary_implications(self, clauses):
+        BinaryImp = defaultdict(list)
+        for a, b in (clause for clause in clauses if len(clause) == 2):
+            BinaryImp[-a].append(b)
+            BinaryImp[-b].append(a)
+        return BinaryImp
+
+    def construct_freevars(self, BinaryImp):
+        freevarsArray = [
+            var for var in range(1, self.m + 1)
+            if (len(BinaryImp[var]) > 0 or len(BinaryImp[-var]) > 0)  # has binary implications
+        ]
+        return freevarsArray
 
     def DFSUtil(self, node: Node, level: int, all_cubes):
 
@@ -138,7 +162,7 @@ class AmsNoMCTS():
             unsat_flag = False
             all_lit_rew = {}
             all_var_rew = {}
-            valid_cubing_lits = node.valid_cubing_lits(self.literals_all)
+            valid_cubing_lits = node.valid_cubing_lits(self.literals_all, self.freevars_all)
 
             for literal in valid_cubing_lits:
                 assert literal not in node.prior_actions+node.unsat_learnt_actions, "Duplicate literals in the list"
@@ -183,7 +207,7 @@ class AmsNoMCTS():
 
         self.leaf_counter = 0
         r = self.DFSUtil(node=node, level=1, all_cubes=all_cubes)
-        print("Reward: ", r)
+        print("Reward: ", round(r, 3))
 
         arena_cubes = [list(map(str, l)) for l in all_cubes]
         if os.path.exists(self.o):
