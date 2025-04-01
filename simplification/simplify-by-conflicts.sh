@@ -31,7 +31,7 @@ elif [ "$mode" = "-exhaustive-no-cas" ]; then
     echo "Running simplification with exhaustive search mode (no CAS)"
     ./cadical-ks/build/cadical-ks "$input_file" --order "$order" --exhaustive -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
     # Output final simplified instance
-    ./gen_cubes/concat.sh "$output_file" "$output_ext" > "${output_file}.tmp" && mv "${output_file}.tmp" "$output_file"
+    #./gen_cubes/concat.sh "$output_file" "$output_ext" > "${output_file}.tmp" && mv "${output_file}.tmp" "$output_file"
 elif [ "$mode" = "-sms" ]; then
     echo "Running simplification with SMS mode"
     triangle_vars=$(( ($order * ($order - 1)) / 2 + 1 ))
