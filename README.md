@@ -36,6 +36,7 @@ The pipeline depends on MapleSAT-ks, CaDiCaL-ks, NetworkX, z3-solver, and AlphaM
 
 
 ## Frontier Guideline
+`maple_setup.sh`
 
 ```
 module use /ccs/proj/csc607/cray-openshmemx/modulefiles
