@@ -24,8 +24,8 @@ LFLAGS    ?= -Wall
 
 COPTIMIZE ?= -O3
 
-CFLAGS    += -I$(MROOT) -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
-LFLAGS    += -lz
+CFLAGS    += -I$(MROOT) -I/usr/include -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS 
+LFLAGS    += -L/usr/lib64 -lz
 
 .PHONY : s p d r rs clean 
 
@@ -51,7 +51,7 @@ $(EXEC):		LFLAGS += -g
 $(EXEC)_profile:	LFLAGS += -g -pg
 $(EXEC)_debug:		LFLAGS += -g
 #$(EXEC)_release:	LFLAGS += ...
-$(EXEC)_static:		LFLAGS += --static
+# $(EXEC)_static:		LFLAGS += --static
 
 ## Dependencies
 $(EXEC):		$(COBJS)
