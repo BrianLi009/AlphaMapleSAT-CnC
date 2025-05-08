@@ -62,7 +62,10 @@ export PLATFORM=cray
 if [ ! -d AlphaMapleSAT2 ]; then
     git clone https://github.com/BrianLi009/AlphaMapleSAT2/
     cd AlphaMapleSAT2/
-    git checkout frontier
+    pip3 install -r alpha-zero-general/requirements.txt
+    cd march
+    make
+    cd ..
     source dependency-setup.sh 
 fi
 ```

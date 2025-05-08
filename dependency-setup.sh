@@ -28,6 +28,32 @@ if [[ "$(printf '%s\n' "$installed_version" "$required_version" | sort -V | head
 else
     echo "Networkx version $installed_version is already installed and newer than $required_version"
 fi
+
+# Check if coloredlogs exists
+if ! python3 -c "import coloredlogs" &> /dev/null; then
+    echo "Installing coloredlogs..."
+    pip3 install coloredlogs
+else
+    echo "coloredlogs is already installed."
+fi
+
+#tqdm
+if ! python3 -c "import tqdm" &> /dev/null; then
+    echo "Installing tqdm..."
+    pip3 install tqdm
+else
+    echo "tqdm is already installed."
+fi
+
+#wandb
+if ! python3 -c "import wandb" &> /dev/null; then
+    echo "Installing wandb..."
+    pip3 install wandb
+else
+    echo "wandb is already installed."
+fi
+
+
 # Check if march_cu is present
 if [ -f gen_cubes/march_cu/march_cu ]
 then

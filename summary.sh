@@ -66,7 +66,7 @@ done < <(find . -type f \( -name "*.log" -o -name "*.verify" \))
 num_nodes=$(find . -name "*.simplog" | wc -l)
 
 # Compute Cubing Time - check both "Tool runtime" and "c time" formats
-cubing_time=$(grep -E 'Tool runtime|c time = ' slurm-*.out | awk '
+cubing_time=$(grep -E 'Tool runtime|c time = ' *.simplog | awk '
     /Tool runtime/ {sum += $3}
     /c time = / {sum += $4}
     END {print sum}
