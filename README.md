@@ -33,3 +33,35 @@ This repository contains a collection of scripts and tools for generating and ve
 ## Pipeline
 
 The pipeline depends on MapleSAT-ks, CaDiCaL-ks, NetworkX, z3-solver, and AlphaMapleSAT. Run `dependency-setup.sh` for dependency setup.
+
+
+## Frontier Guideline
+
+```
+module use /ccs/proj/csc607/cray-openshmemx/modulefiles
+module purge
+module load PrgEnv-cray/8.3.3
+module load craype-x86-trento
+module load cray-openshmemx/11.7.2.3
+module load cray-pmi
+module load cray-mrnet
+module load xpmem
+#module load perftools-base
+module load cray-python/3.10.10
+module load valgrind4hpc
+module unload darshan-runtime
+module unload hsi
+module unload DefApps
+module unload cray-libsci
+module load cray-fix
+
+PROJ_DIR=/ccs/proj/csc607
+export PLATFORM=cray
+
+if [ ! -d AlphaMapleSAT2 ]; then
+    git clone https://github.com/BrianLi009/AlphaMapleSAT2/
+    cd AlphaMapleSAT2/
+    git checkout frontier
+    source dependency-setup.sh 
+fi
+```
