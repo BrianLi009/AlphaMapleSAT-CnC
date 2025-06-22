@@ -71,7 +71,7 @@ then
 		if $use_s_flag
 		then
 			echo "Number of simulations set to $s"
-			command="python -u alpha-zero-general/main.py $f -d 1 -m $m -o $dir/0.cubes -order $n -prod -numMCTSSims $s | tee $logdir/0.log"
+			command="python -u AlphaMapleSAT/alphamaplesat/main.py $f -d 1 -m $m -o $dir/0.cubes -order $n -prod -numMCTSSims $s | tee $logdir/0.log"
 		else
 			#command="python ams_no_mcts.py $f -d 1 -m $m -o $dir/0.cubes | tee $logdir/0.log"
 			command="./gen_cubes/march_cu/march_cu $f -o $dir/0.cubes -d 1 -m $m | tee $logdir/0.log"

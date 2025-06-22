@@ -43,7 +43,7 @@ echo "Processing $cubeline..."
 ./gen_cubes/apply.sh $f $dir/$((i-1)).cubes $c > $dir/$((i-1)).cubes$c
 if $use_s_flag
 then
-    command="python -u alpha-zero-general/main.py $dir/$((i-1)).cubes$c -d 1 -m $m -o $dir/$((i-1)).cubes$c.cubes -order $n -prod -numMCTSSims $s | tee $logdir/$((i-1)).cubes$c.log"
+    command="python -u AlphaMapleSAT/alphamaplesat/main.py $dir/$((i-1)).cubes$c -d 1 -m $m -o $dir/$((i-1)).cubes$c.cubes -order $n -prod -numMCTSSims $s | tee $logdir/$((i-1)).cubes$c.log"
 else
 	#command="python ams_no_mcts.py $dir/$((i-1)).cubes$c -d 1 -m $m -o $dir/$((i-1)).cubes$c.cubes | tee $logdir/$((i-1)).cubes$c.log"
   command="./gen_cubes/march_cu/march_cu $dir/$((i-1)).cubes$c -o $dir/$((i-1)).cubes$c.cubes -d 1 -m $m | tee $logdir/$((i-1)).cubes$c.log"

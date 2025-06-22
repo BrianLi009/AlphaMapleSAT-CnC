@@ -189,8 +189,8 @@ def cube(original_file, cube, index, m, order, numMCTS, queue, cutoff='d', cutof
     if cubing_mode_g == "march":
         subprocess.run(f"./march/march_cu {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp", shell=True)
     else:  # ams mode
-        subprocess.run(f"python3 -u alpha-zero-general/main.py {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp -prod -numMCTSSims {numMCTS}", shell=True)
-        #subprocess.run(f"python3 -u alpha-zero-general/main.py {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp -order {order} -prod -numMCTSSims {numMCTS}", shell=True)
+        subprocess.run(f"python3 -u AlphaMapleSAT/alphamaplesat/main.py {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp -prod -numMCTSSims {numMCTS}", shell=True)
+        #subprocess.run(f"python3 -u AlphaMapleSAT/alphamaplesat/main.py {file_to_cube} -d 1 -m {m} -o {file_to_cube}.temp -order {order} -prod -numMCTSSims {numMCTS}", shell=True)
 
     #output {file_to_cube}.temp with the cubes
     d += 1
