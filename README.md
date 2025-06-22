@@ -1,35 +1,86 @@
-# Kochen-Specker Graph Generation and Verification
+# AlphaMapleSAT-CnC
 
-This repository contains a collection of scripts and tools for generating and verifying Kochen-Specker graphs. 
+<!-- virtualenv --no-download ams_env
+source ams_env/bin/activate
+cd alphamaplesat
+pip install --upgrade pip
+pip install -r requirements_cc.txt
 
-## Components
+python -u main.py "constraints_17_c_100000_2_2_0_final.simp" -d 1 -m 136 -o "test.cubes" -prod -->
 
-- `embedability`: Checks whether Kochen–Specker candidates are embeddable. If a candidate is embeddable, it is a Kochen–Specker graph. Use `check-embed.sh` to run this check.
+AlphaMapleSAT is a novel Monte Carlo Tree Search (MCTS) based Cube-and-Conquer (CnC) SAT solving method aimed at efficiently solving challenging combinatorial problems. 
 
-- `gen_cubes`: Generates the cubes used in the cube-and-conquer approach.
+## Features
 
-- `gen_instance`: Includes scripts that generate SAT instances of a certain order satisfying certain constraints. Use `generate-instance.sh` to run these scripts.
+- **Parallel Execution**: Utilizes multiprocessing for efficient cubing and solving.
+- **Flexible Configuration**: Supports multiple solving modes (`satcas`, `exhaustive-no-cas`, `sms`, `smsd2`, `other`) and cubing modes (`march`, `ams`).
+- **Customizable Parameters**: Allows fine-tuning of cubing depth, variable cutoff, and solving strategies.
+- **Pipeline Integration**: Combines cubing, simplification, and solving into a seamless workflow.
 
-- `maplesat-ks`: A MapleSAT solver with orderly generation (SAT + CAS).
+## Installation
 
-- `cadical-ks`: A CaDiCaL solver with orderly generation (SAT + CAS).
+1. Clone this repository
 
-- `simplification`: Contains scripts relevant to the simplification process in the pipeline.
+2. Run the dependency setup script:
+```bash
+./dependency-setup.sh
+```
 
-## Scripts
+3. Set up the AlphaMapleSAT cubing tool (Use Python 3.10 for optimal compatibility):
+```bash
+virtualenv --no-download ams_env
+source ams_env/bin/activate
+cd alphamaplesat
+pip install --upgrade pip
+pip install -r requirements_cc.txt
+```
 
-- `generate-instance.sh`: Initiates the instance generation in order `n`. Run with `./generate-instance.sh n`.
+## Usage
 
-- `cube-solve.sh`: Performs iterative cubing, merges cubes into the instance, simplifies with CaDiCaL+CAS, and solves with MapleSAT+CAS.
+### Entry Point: `parallel-solve.py`
 
-- `check-embed.sh`: Performs embeddability checking on `n.exhaust`, which is the file that contains all Kochen–Specker candidates output by MapleSAT. Run with `./check-embed.sh n` (graph order).
+The main script for running the pipeline is `parallel-solve.py`. It supports various configurations for cubing and solving.
 
-- `dependency-setup.sh`: Sets up all dependencies. See the script documentation for details. Run with `./dependency-setup.sh`.
+#### Example Command:
+```bash
+python3 parallel-solve.py 17 ks_17.cnf -m 136 --solving-mode satcas --cubing-mode ams --timeout 7200
+```
 
-- `main.sh`: Driver script that connects all scripts stated above. Running this script will execute the entire pipeline. Run with `./main.sh n` (graph order).
+### Metrics Summary: `summary.sh`
 
-- `verify.sh`: Verifies all KS candidates satisfy the constraints.
+After running the pipeline, use `summary.sh` to analyze cubing and solving metrics.
 
-## Pipeline
+#### Example Command:
+```bash
+summary.sh <name_of_instance_folder>
+```
 
-The pipeline depends on MapleSAT-ks, CaDiCaL-ks, NetworkX, z3-solver, and AlphaMapleSAT. Run `dependency-setup.sh` for dependency setup.
+Ensure each instance has its own folder for better organization.
+
+### Running the AlphaMapleSAT Cubing Tool Independently
+
+To run the cubing tool independently:
+```bash
+source ams_env/bin/activate
+cd alphamaplesat
+python -u main.py "constraints_17_c_100000_2_2_0_final.simp" -d 1 -m 136 -o "test.cubes" -prod
+```
+
+This command will generate cubes from the specified constraints file, using a depth of 1 and a maximum of 136 variables and outputting to `test.cubes`. 
+
+## License
+
+This project is licensed under MIT license. See the LICENSE file for details.
+
+## Citation
+
+If you use AlphaMapleSAT in your research, please cite it as follows:
+
+```bibtex
+@article{jha2024alphamaplesat,
+  title={Alphamaplesat: An MCTS-based cube-and-conquer SAT solver for hard combinatorial problems},
+  author={Jha, Piyush and Li, Zhengyu and Lu, Zhengyang and Bright, Curtis and Ganesh, Vijay},
+  journal={arXiv preprint arXiv:2401.13770},
+  year={2024}
+}
+```
