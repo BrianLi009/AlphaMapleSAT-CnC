@@ -1,13 +1,5 @@
 # AlphaMapleSAT-CnC
 
-<!-- virtualenv --no-download ams_env
-source ams_env/bin/activate
-cd alphamaplesat
-pip install --upgrade pip
-pip install -r requirements_cc.txt
-
-python -u main.py "constraints_17_c_100000_2_2_0_final.simp" -d 1 -m 136 -o "test.cubes" -prod -->
-
 AlphaMapleSAT is a novel Monte Carlo Tree Search (MCTS) based Cube-and-Conquer (CnC) SAT solving method aimed at efficiently solving challenging combinatorial problems. 
 
 ## Features
@@ -34,7 +26,7 @@ source ams_env/bin/activate
 git clone https://github.com/piyush-J/AlphaMapleSAT.git
 cd alphamaplesat
 pip install --upgrade pip
-pip install -r requirements_cc.txt
+pip install -r requirements.txt
 ```
 
 ## Usage
