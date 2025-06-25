@@ -30,6 +30,8 @@ AlphaMapleSAT is a novel Monte Carlo Tree Search (MCTS) based Cube-and-Conquer (
 ```bash
 virtualenv --no-download ams_env
 source ams_env/bin/activate
+
+git clone https://github.com/piyush-J/AlphaMapleSAT.git
 cd alphamaplesat
 pip install --upgrade pip
 pip install -r requirements_cc.txt
