@@ -2,6 +2,7 @@ import argparse
 import os
 import subprocess
 
+import mpi4py
 from mpi4py import MPI
 
 def clean_files(files):
@@ -165,6 +166,7 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
                 new_jobs = cube(*work)
                 comm.send(new_jobs, dest=0, tag=0)
             else:
+                print("Rank " + str(rank) +" done.", flush=True)               
                 break
     else:
         requests = []
@@ -173,7 +175,7 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
         workers = [0]*size
 
         while queue or requests:
-            print(queue)
+            print(queue, flush=True)
             for i in range(1,size):
                 if queue and workers[i] == 0:
                     job = queue.pop(0)
@@ -186,9 +188,11 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
                 workers[status.Get_source()] = 0
                 queue.extend(jobs[1])
         for i in range(1, size):
-            comm.isend([], dest=i, tag=0)
+            comm.send([], dest=i, tag=0)
+    MPI.Finalize()
 
 if __name__ == "__main__":
+    mpi4py.rc.recv_mprobe = False
     parser = argparse.ArgumentParser(
         epilog='Example usage: python3 parallel-solve.py 17 instances/ks_17.cnf -m 136 --solving-mode satcas --cubing-mode ams --timeout 7200'
     )
