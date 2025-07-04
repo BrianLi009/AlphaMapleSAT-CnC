@@ -1,0 +1,1473 @@
+#include "RCL.hpp"
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <algorithm>
+#include <cstring>
+#include <array>
+#include <chrono>
+#include <cstdio>
+#include <memory>
+#include <stdexcept>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <unordered_set>
+#include <cmath>
+#include "unembeddable_graphs.h"
+#include <filesystem>
+
+#define DEBUG_PRINT(x) if (print_statement) { std::cout << "DEBUG: " << x << std::endl; }
+
+#define WORDSIZE 64
+#define MAXNV 64
+#define DEFAULT_PARTITION_SIZE 0
+
+// Default number of unembeddable graphs to check
+#define DEFAULT_UNEMBEDDABLE_CHECK 13
+
+// Add these two variables for optimization
+const int SMALL_GRAPH_ORDER = 13;
+const int EDGE_CUTOFF = 78;  // 13 choose 2 = 78
+
+long canon = 0;
+long noncanon = 0;
+double canontime = 0;
+double noncanontime = 0;
+long canonarr[MAXNV] = {};
+long noncanonarr[MAXNV] = {};
+double canontimearr[MAXNV] = {};
+double noncanontimearr[MAXNV] = {};
+long muscount = 0;
+long muscounts[17] = {0};  // Initialize all elements to zero explicitly
+double mustime = 0;
+// Add at the top with other file pointers
+FILE* solution_file = fopen("solutions.txt", "w");
+
+// Add at the top with other time variables
+double subgraph_check_time = 0;
+
+// Add these counters at the top with other statistics variables
+long geo_feasible_count = 0;
+long geo_infeasible_count = 0;
+double geo_check_time = 0;
+
+// Add these constants for the SIC-POVM vectors
+const std::vector<std::array<double, 3>> SIC_VECTORS = {
+    {-1.0, 1.0, 1.0},   // v1
+    {1.0, -1.0, 1.0},   // v2
+    {1.0, 1.0, -1.0},   // v3
+    {1.0, 1.0, 1.0},    // v4
+    {1.0, 0.0, 0.0},    // v5
+    {0.0, 1.0, 0.0},    // v6
+    {0.0, 0.0, 1.0},    // v7
+    {1.0, -1.0, 0.0},   // v8
+    {1.0, 0.0, -1.0},   // v9
+    {0.0, 1.0, -1.0},   // v10
+    {0.0, 1.0, 1.0},    // v11
+    {1.0, 0.0, 1.0},    // v12
+    {1.0, 1.0, 0.0}     // v13
+};
+
+SymmetryBreaker::SymmetryBreaker(CaDiCaL::Solver* s, int order, int uc, int ps) : solver(s) {
+    // Set print_statement to true at the beginning of the constructor
+    print_statement = true;
+    
+    DEBUG_PRINT("Entered RCL SymmetryBreaker constructor");
+    if (order == 0) {
+        std::cout << "c Need to provide order to use programmatic code" << std::endl;
+        return;
+    }
+    
+    // Set default unembeddable check if not specified
+    if (uc == 0) {
+        uc = DEFAULT_UNEMBEDDABLE_CHECK;
+        std::cout << "c Using default unembeddable subgraphs check (" << uc << " graphs)" << std::endl;
+    } else {
+        std::cout << "c Checking for " << uc << " unembeddable subgraphs" << std::endl;
+    }
+    
+    // Set default partition size if not specified
+    if (ps == 0) {
+        ps = DEFAULT_PARTITION_SIZE;
+        std::cout << "c Using default partition size (" << ps << ")" << std::endl;
+    } else {
+        std::cout << "c Using partition size " << ps << std::endl;
+    }
+    
+    n = order;
+    num_edge_vars = n*(n-1)/2;
+    unembeddable_check = uc;
+    partition_size = ps;
+    
+    // Add a clear print statement showing both order and partition size
+    std::cout << "c Running with order = " << n << " and partition size = " << partition_size << std::endl;
+    
+    DEBUG_PRINT("Allocating memory");
+    assign = new int[num_edge_vars];
+    fixed = new bool[num_edge_vars];
+    colsuntouched = new int[n];
+    
+    DEBUG_PRINT("Connecting external propagator");
+    solver->connect_external_propagator(this);
+    
+    DEBUG_PRINT("Initializing arrays");
+    for (int i = 0; i < num_edge_vars; i++) {
+        assign[i] = l_Undef;
+        fixed[i] = false;
+        solver->add_observed_var(i+1);
+    }
+    std::fill_n(colsuntouched, n, 0);
+    
+    current_trail.push_back(std::vector<int>());
+    
+    learned_clauses_count = 0;
+    canonize_calls = 0;
+    total_canonize_time = 0;
+    
+    seen_partial_assignments.clear();
+    
+    initNautyOptions();
+
+    // Load the master graph
+    load_master_graph("cadical-rcl/data/SI-C-c1-labeled-37.lad");
+
+#ifdef GLASGOW
+    // Initialize GSS parameters
+    defaultHomParams = {
+        .timeout = std::make_shared<Timeout>(0s),
+        .restarts_schedule = std::make_unique<LubyRestartsSchedule>(LubyRestartsSchedule::default_multiplier),
+        .no_supplementals = true
+    };
+
+    inducedHomParams = {
+        .timeout = std::make_shared<Timeout>(0s),
+        .induced = true,
+        .restarts_schedule = std::make_unique<LubyRestartsSchedule>(LubyRestartsSchedule::default_multiplier),
+        .no_supplementals = true
+    };
+#endif
+
+    // Reset counters
+    muscount = 0;
+    for (int i = 0; i < 17; i++) {
+        muscounts[i] = 0;
+    }
+
+    DEBUG_PRINT("SymmetryBreaker constructor completed");
+}
+
+SymmetryBreaker::~SymmetryBreaker() {
+    // First disconnect the propagator
+    solver->disconnect_external_propagator();
+    
+    // Free memory
+    delete[] assign;
+    delete[] fixed;
+    delete[] colsuntouched;
+    
+    // Close the solution file
+    if (solution_file) {
+        fclose(solution_file);
+        solution_file = nullptr;
+    }
+    
+    // Force flush stdout before printing statistics
+    fflush(stdout);
+    
+    // Print all statistics with explicit fflush after each section
+    printf("Number of solutions   : %ld\n", sol_count);
+    fflush(stdout);
+    
+    printf("Canonical subgraphs   : %-12ld   (%.0f /sec)\n", canon, canon > 0 ? canon/canontime : 0);
+    fflush(stdout);
+    
+    for(int i=2; i<n; i++) {
+        printf("          order %2d    : %-12ld   (%.0f /sec)\n", 
+               i+1, 
+               canonarr[i], 
+               canonarr[i] > 0 ? canonarr[i]/canontimearr[i] : 0);
+        fflush(stdout);
+    }
+    
+    printf("Noncanonical subgraphs: %-12ld   (%.0f /sec)\n", noncanon, noncanon > 0 ? noncanon/noncanontime : 0);
+    fflush(stdout);
+    
+    for(int i=2; i<n; i++) {
+        printf("          order %2d    : %-12ld   (%.0f /sec)\n", 
+               i+1, 
+               noncanonarr[i], 
+               noncanonarr[i] > 0 ? noncanonarr[i]/noncanontimearr[i] : 0);
+        fflush(stdout);
+    }
+    
+    printf("Canonicity checking   : %g s\n", canontime);
+    printf("Noncanonicity checking: %g s\n", noncanontime);
+    printf("Total canonicity time : %g s\n", canontime + noncanontime);
+    fflush(stdout);
+    
+    if (unembeddable_check > 0) {
+        printf("Unembeddable checking : %g s\n", mustime);
+        fflush(stdout);
+        
+        for(int g=0; g<unembeddable_check; g++) {
+            printf("        graph #%2d     : %-12ld\n", g, muscounts[g]);
+            fflush(stdout);
+        }
+        
+        printf("Total unembed. graphs : %ld\n", muscount);
+        fflush(stdout);
+    }
+
+    // Print subgraph statistics
+    print_subgraph_statistics();
+    fflush(stdout);
+    
+    // Print geometric feasibility statistics
+    print_geometric_statistics();
+    fflush(stdout);
+    
+    // Final flush to ensure everything is printed
+    fflush(stdout);
+}
+
+std::string SymmetryBreaker::convert_assignment_to_string(int k) {
+    std::string result;
+    result.reserve(k * (k - 1) / 2);
+    for (int j = 1; j < k; j++) {
+        for (int i = 0; i < j; i++) {
+            result += (assign[j*(j-1)/2 + i] == l_True) ? '1' : '0';
+        }
+    }
+    return result;
+}
+
+void SymmetryBreaker::stringToGraph(const std::string& input, graph* g, int n, int m) {
+    int index = 0;
+    DEBUG_PRINT("Converting string to graph. Input: " << input);
+    for (int j = 1; j < n; j++) {
+        for (int i = 0; i < j; i++) {
+            if (input[index++] == '1') {
+                ADDONEEDGE(g, i, j, m);
+                ADDONEEDGE(g, j, i, m);  // Ensure symmetry
+                DEBUG_PRINT("Added edge between " << i << " and " << j);
+            }
+        }
+    }
+}
+
+void SymmetryBreaker::Getcan_Rec(graph g[MAXNV], int n, int can[], int orbits[]) {
+    int lab1[MAXNV], lab2[MAXNV], inv_lab1[MAXNV], ptn[MAXNV];
+    int i, j, k;
+    setword st;
+    graph g2[MAXNV];
+    int m = SETWORDSNEEDED(n);
+
+    if (n == 1) {
+        can[n-1] = n-1;
+    } else {
+        // Set up nauty options
+        options.writeautoms = FALSE;
+        options.writemarkers = FALSE;
+        options.getcanon = TRUE;
+        
+        // Update to use the partition_size member variable
+        if (n > partition_size) {
+            options.defaultptn = FALSE;
+            for (i = 0; i < n-1; i++) {
+                if (i == partition_size-1) {
+                    ptn[i] = 0;  // Mark end of first partition
+                } else {
+                    ptn[i] = 1;  // Same partition continues
+                }
+            }
+            ptn[n-1] = 0;  // Last vertex always ends its partition
+        } else {
+            options.defaultptn = TRUE;  // Use default partition for small graphs
+        }
+
+        // Initialize lab array with identity permutation
+        for (i = 0; i < n; i++) {
+            lab1[i] = i;
+        }
+
+        nauty(g, lab1, ptn, NULL, orbits, &options, &stats, workspace, 50, m, n, g2);
+
+        for (i = 0; i < n; i++)
+            inv_lab1[lab1[i]] = i;
+        for (i = 0; i <= n-2; i++) {
+            j = lab1[i];
+            st = g[j];
+            g2[i] = 0;
+            while (st) {
+                k = FIRSTBIT(st);
+                st ^= bit[k];
+                k = inv_lab1[k];
+                if (k != n-1)
+                    g2[i] |= bit[k];
+            }
+        }
+        Getcan_Rec(g2, n-1, lab2, orbits);
+        for (i = 0; i <= n-2; i++)
+            can[i] = lab1[lab2[i]];
+        can[n-1] = lab1[n-1];
+    }
+}
+
+bool SymmetryBreaker::isCanonical(const std::string& input) {
+    int n = static_cast<int>(std::sqrt(2 * input.length() + 0.25) + 0.5);
+    int m = SETWORDSNEEDED(n);
+    
+    DEBUG_PRINT("Checking canonicity for input: " << input);
+    DEBUG_PRINT("Calculated n = " << n << ", m = " << m);
+
+    graph g[MAXNV];
+    for (int i = 0; i < n; i++) {
+        EMPTYSET(GRAPHROW(g, i, m), m);
+    }
+    stringToGraph(input, g, n, m);
+
+    DEBUG_PRINT("Original graph:");
+    printGraph(g, n, m);
+
+    int can[MAXNV];
+    graph cang[MAXNV];
+    
+    Getcan_Rec(g, n, can, orbits);
+
+    if (print_statement) {
+        std::cout << "DEBUG: Canonical labeling:" << std::endl;
+        for (int i = 0; i < n; i++) {
+            std::cout << "  " << can[i] << " -> " << i << std::endl;
+        }
+    }
+
+    // Construct the canonical graph
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            cang[i*m + j] = 0;
+        }
+        for (int j = 0; j < n; j++) {
+            if (ISELEMENT(GRAPHROW(g, can[i], m), can[j])) {
+                ADDONEEDGE(cang, i, j, m);
+            }
+        }
+    }
+
+    DEBUG_PRINT("Canonical graph:");
+    printGraph(cang, n, m);
+
+    // Compare the input graph with the canonical graph
+    bool is_canonical = true;
+    for (int i = 0; i < n && is_canonical; i++) {
+        for (int j = 0; j < m && is_canonical; j++) {
+            if (g[i*m + j] != cang[i*m + j]) {
+                is_canonical = false;
+            }
+        }
+    }
+
+    DEBUG_PRINT("isCanonical result: " << (is_canonical ? "true" : "false"));
+    return is_canonical;
+}
+
+bool SymmetryBreaker::has_mus_subgraph(int k, int* P, int* p, int g) {
+    int pl[12]; // pl[k] contains the current list of possibilities for kth vertex
+    int pn[13]; // pn[k] contains the initial list of possibilities for kth vertex
+    pl[0] = (1 << k) - 1;
+    pn[0] = (1 << k) - 1;
+    int i = 0;
+
+    while(1) {
+        // If no possibilities for ith vertex then backtrack
+        if(pl[i]==0) {
+            while((pl[i] & (pl[i] - 1)) == 0) {
+                i--;
+                if(i==-1) {
+                    return false;  // No permutations produce a matrix containing the gth submatrix
+                }
+            }
+            pl[i] = pl[i] & ~(1 << p[i]);
+        }
+
+        p[i] = log2(pl[i] & -pl[i]); // Get index of rightmost high bit
+        pn[i+1] = pn[i] & ~(1 << p[i]); // List of possibilities for (i+1)th vertex
+
+        // Check if permuted matrix contains the gth submatrix
+        bool result_known = false;
+        for(int j=0; j<i; j++) {
+            if(!mus[g][i*(i-1)/2+j]) continue;
+            const int px = MAX(p[i], p[j]);
+            const int py = MIN(p[i], p[j]);
+            const int pj = px*(px-1)/2 + py;
+            if(assign[pj] == l_False) {
+                result_known = true;
+                break;
+            }
+        }
+
+        if(!result_known && ((i == 9 && g < 2) || (i == 10 && g < 7) || i == 11)) {
+            // Found complete gth submatrix in p(M)
+            for(int j=0; j<=i; j++) {
+                P[p[j]] = j;
+            }
+            return true;
+        }
+        if(!result_known) {
+            i++;
+            pl[i] = pn[i];
+        } else {
+            pl[i] = pl[i] & ~(1 << p[i]);
+        }
+    }
+}
+
+std::vector<int> SymmetryBreaker::call_RCL_binary(const std::string& input, int k) {
+    if (!isCanonical(input)) {
+        if (print_statement) {
+            std::cout << "DEBUG: Input is not canonical" << std::endl;
+        }
+        return generate_naive_blocking_clause(input);
+    }
+    
+    // Check for unembeddable subgraphs
+    if (unembeddable_check > 0) {
+        int P[n];
+        int p[12];
+        for(int j=0; j<n; j++) P[j] = -1;
+        
+        const double before = CaDiCaL::absolute_process_time();
+        for(int g=0; g<unembeddable_check; g++) {
+            if (has_mus_subgraph(k, P, p, g)) {
+                muscount++;
+                muscounts[g]++;
+                
+                // Generate blocking clause for unembeddable subgraph
+                std::vector<int> blocking_clause;
+                int c = 0;
+                for(int jj=0; jj<k; jj++) {
+                    for(int ii=0; ii<jj; ii++) {
+                        if(input[c] == '1' && P[jj] != -1 && P[ii] != -1) {
+                            if((P[ii] < P[jj] && mus[g][P[ii] + P[jj]*(P[jj]-1)/2]) || 
+                               (P[jj] < P[ii] && mus[g][P[jj] + P[ii]*(P[ii]-1)/2])) {
+                                blocking_clause.push_back(-(c+1));
+                            }
+                        }
+                        c++;
+                    }
+                }
+                const double after = CaDiCaL::absolute_process_time();
+                mustime += (after-before);
+                
+                if (print_statement) {
+                    std::cout << "DEBUG: Found unembeddable subgraph #" << g << std::endl;
+                }
+                return blocking_clause;
+            }
+        }
+    }
+    
+    if (print_statement) {
+        std::cout << "DEBUG: Input is canonical" << std::endl;
+    }
+    return std::vector<int>();
+}
+
+// Helper function to extract a submatrix from the input string
+std::string SymmetryBreaker::extract_submatrix(const std::string& input, int k) {
+    std::string submatrix;
+    int n = static_cast<int>(std::sqrt(2 * input.length() + 0.25) + 0.5);
+    for (int j = 1; j < k; ++j) {
+        for (int i = 0; i < j; ++i) {
+            int index = j * (j - 1) / 2 + i;
+            submatrix += input[index];
+        }
+    }
+    return submatrix;
+}
+
+// Add this new function to check for non-decreasing degrees
+std::vector<int> SymmetryBreaker::check_non_decreasing_degrees(const std::string& assignment, int k) {
+    std::vector<int> blocking_clause;
+    
+    // Only proceed if we have at least 2 columns
+    if (k < 2) return blocking_clause;
+    
+    // Count ones in the last two columns only
+    int second_last_ones = 0;
+    int last_ones = 0;
+    
+    // Count ones in second-last column (k-2)
+    for (int i = 0; i < k-2; i++) {
+        int var_index = (k-2)*(k-3)/2 + i;
+        if (assignment[var_index] == '1') {
+            second_last_ones++;
+        }
+    }
+    
+    // Count ones in last column (k-1)
+    for (int i = 0; i < k-1; i++) {
+        int var_index = (k-1)*(k-2)/2 + i;
+        if (assignment[var_index] == '1') {
+            last_ones++;
+        }
+    }
+
+    if (print_statement) {
+        std::cout << "DEBUG: Last two column degrees: " 
+                  << second_last_ones << " " << last_ones << std::endl;
+    }
+
+    // Check if second-last column has more ones than last column
+    if (second_last_ones > last_ones) {
+        if (print_statement) {
+            std::cout << "DEBUG: Columns " << k-2 << " and " << k-1 
+                     << " violate non-decreasing order (" 
+                     << second_last_ones << " > " << last_ones << ")" << std::endl;
+        }
+        
+        // Add literals for second-last column
+        for (int i = 0; i < k-2; i++) {
+            int var_index = (k-2)*(k-3)/2 + i;
+            int literal = assignment[var_index] == '1' ? -(var_index + 1) : (var_index + 1);
+            blocking_clause.push_back(literal);
+        }
+        
+        // Add literals for last column
+        for (int i = 0; i < k-1; i++) {
+            int var_index = (k-1)*(k-2)/2 + i;
+            int literal = assignment[var_index] == '1' ? -(var_index + 1) : (var_index + 1);
+            blocking_clause.push_back(literal);
+        }
+
+        if (print_statement) {
+            std::cout << "DEBUG: Generated degree blocking clause: ";
+            for (int lit : blocking_clause) {
+                std::cout << lit << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    return blocking_clause;
+}
+
+// Modify the block_extension function to use the new check
+std::vector<int> SymmetryBreaker::block_extension(int k) {
+    std::string input = convert_assignment_to_string(k);
+    if (print_statement) {
+        std::cout << "Checking for partial assignment: " << input << std::endl;
+        std::cout << "DEBUG: use_master_graph = " << use_master_graph << std::endl;
+    }
+    
+    // Convert to adjacency matrix
+    adjacency_matrix_t matrix = string_to_adjacency_matrix(input, k);
+    
+    // Check if the partial assignment is a subgraph of the master graph
+    if (use_master_graph) {
+        bool is_subgraph = is_subgraph_of_master(matrix);
+        if (is_subgraph) {
+            subgraph_count++;
+        } else {
+            non_subgraph_count++;
+            if (print_statement) {
+                std::cout << "DEBUG: Partial assignment is not a subgraph of the master graph" << std::endl;
+            }
+            return generate_naive_blocking_clause(input, true);
+        }
+    }
+    
+    const double before = CaDiCaL::absolute_process_time();
+    std::vector<int> blocking_clause = call_RCL_binary(input, k);
+    const double after = CaDiCaL::absolute_process_time();
+    
+    if (blocking_clause.empty()) {
+        canon++;
+        canontime += (after-before);
+        canonarr[k-1]++;
+        canontimearr[k-1] += (after-before);
+    } else {
+        noncanon++;
+        noncanontime += (after-before);
+        noncanonarr[k-1]++;
+        noncanontimearr[k-1] += (after-before);
+    }
+
+    if (!blocking_clause.empty()) {
+        learned_clauses_count++;
+    }
+
+    return blocking_clause;
+}
+
+void SymmetryBreaker::notify_assignment(int lit, bool is_fixed) {
+    int var = std::abs(lit) - 1;
+    if (var < num_edge_vars) {
+        assign[var] = (lit > 0) ? l_True : l_False;
+        fixed[var] = is_fixed;
+    }
+}
+
+void SymmetryBreaker::notify_new_decision_level() {
+    current_trail.push_back(std::vector<int>());
+}
+
+void SymmetryBreaker::notify_backtrack(size_t new_level) {
+    while (current_trail.size() > new_level) {
+        for (int lit : current_trail.back()) {
+            int var = std::abs(lit) - 1;
+            if (var < num_edge_vars) {
+                assign[var] = l_Undef;
+                fixed[var] = false;
+            }
+        }
+        current_trail.pop_back();
+    }
+}
+
+bool SymmetryBreaker::cb_check_found_model(const std::vector<int>& model) {
+    std::string full_assignment = convert_assignment_to_string(n);
+    std::vector<int> blocking_clause = block_extension(n);
+
+    if (blocking_clause.empty()) {  // Canonical
+        sol_count++;
+        if (print_statement) {
+            std::cout << "Found canonical solution #" << sol_count << ": " << full_assignment << std::endl;
+        }
+        
+        // Write solution to file
+        if (solution_file) {
+            fprintf(solution_file, "Solution %ld: %s\n", sol_count, full_assignment.c_str());
+        }
+        
+        // Generate a blocking clause for this solution
+        for (int i = 0; i < num_edge_vars; i++) {
+            blocking_clause.push_back(assign[i] == l_True ? -(i + 1) : (i + 1));
+        }
+    } else if (print_statement) {
+        std::cout << "Found non-canonical full assignment: " << full_assignment << std::endl;
+    }
+
+    new_clauses.push_back(blocking_clause);
+    return false;
+}
+
+bool SymmetryBreaker::cb_has_external_clause() {
+    if (!new_clauses.empty()) {
+        if (print_statement) {
+            DEBUG_PRINT("Found existing clauses in queue, returning true");
+        }
+        return true;
+    }
+
+    static int subgraph_check_counter = 0;
+    static std::unordered_set<std::string> seen_subgraph_assignments;
+    
+    // Print current partial assignment
+    std::string current_assignment_str = convert_assignment_to_string(n);
+    if (print_statement) {
+        DEBUG_PRINT("Processing partial assignment: " << current_assignment_str);
+    }
+    
+    // Check if we've already processed this assignment
+    size_t hash_value = std::hash<std::string>{}(current_assignment_str);
+    if (seen_partial_assignments.find(hash_value) != seen_partial_assignments.end()) {
+        if (print_statement) {
+            DEBUG_PRINT("Skipping already processed partial assignment");
+        }
+        return false;
+    }
+    seen_partial_assignments.insert(hash_value);
+    
+    // Check if we only have variables <= 78 assigned
+    bool only_small_vars = true;
+    int highest_assigned_var = 0;
+    
+    for (int var = 0; var < num_edge_vars; var++) {
+        if (assign[var] != l_Undef) {
+            highest_assigned_var = std::max(highest_assigned_var, var + 1);
+            if (var + 1 > EDGE_CUTOFF) {
+                only_small_vars = false;
+                break;
+            }
+        }
+    }
+    
+    // Skip all external propagator checks if we only have small variables
+    if (only_small_vars) {
+        if (print_statement) {
+            DEBUG_PRINT("Skipping external propagator checks - only variables <= 78 are assigned (highest: " 
+                      << highest_assigned_var << ")");
+        }
+        return false;
+    }
+    
+    // First check if current partial assignment is a subgraph of master graph
+    if (use_master_graph && subgraph_check_counter % 1 == 0) {
+        if (print_statement) {
+            DEBUG_PRINT("Starting master graph subgraph check");
+        }
+        
+        // Create a string representation of the current assignment (only true edges)
+        std::string current_assignment;
+        current_assignment.reserve(num_edge_vars * 4); // Pre-allocate memory
+        
+        // Quick check if we have any true assignments
+        bool has_true_assignments = false;
+        for (int j = 1; j < n && !has_true_assignments; j++) {
+            for (int i = 0; i < j; i++) {
+                int var_index = j*(j-1)/2 + i;
+                if (assign[var_index] == l_True) {
+                    has_true_assignments = true;
+                    break;
+                }
+            }
+        }
+        
+        // If no true assignments, it's trivially a subgraph
+        bool need_to_check = has_true_assignments;
+        
+        if (need_to_check) {
+            for (int j = 1; j < n; j++) {
+                for (int i = 0; i < j; i++) {
+                    int var_index = j*(j-1)/2 + i;
+                    if (assign[var_index] == l_True) {
+                        current_assignment += std::to_string(var_index) + ",";
+                    }
+                }
+            }
+            
+            // Check if we've already processed this assignment
+            if (seen_subgraph_assignments.find(current_assignment) != seen_subgraph_assignments.end()) {
+                need_to_check = false;
+            } else {
+                seen_subgraph_assignments.insert(current_assignment);
+            }
+        }
+        
+        if (need_to_check) {
+            if (print_statement) {
+                DEBUG_PRINT("Converting partial assignment to adjacency matrix");
+            }
+            adjacency_matrix_t partial_matrix = string_to_adjacency_matrix(current_assignment_str, n);
+            
+            if (print_statement) {
+                DEBUG_PRINT("Checking if partial assignment is subgraph of master graph");
+            }
+            bool is_subgraph = is_subgraph_of_master(partial_matrix);
+            
+            if (!is_subgraph) {
+                if (print_statement) {
+                    DEBUG_PRINT("Partial assignment is NOT a subgraph of master graph");
+                }
+                std::vector<int> blocking_clause = generate_naive_blocking_clause(current_assignment_str, true);
+                
+                if (!blocking_clause.empty() && print_statement) {
+                    DEBUG_PRINT("Generated subgraph blocking clause: ");
+                    for (int lit : blocking_clause) {
+                        std::cout << "  " << lit;
+                    }
+                    std::cout << std::endl;
+                }
+                
+                new_clauses.push_back(blocking_clause);
+                non_subgraph_count++;
+                return true;
+            } else if (print_statement) {
+                DEBUG_PRINT("Partial assignment IS a subgraph of master graph");
+            }
+        }
+    }
+    
+    subgraph_check_counter++;
+
+    // Then proceed with the regular canonicity checks
+    for (int k = SMALL_GRAPH_ORDER; k < n; k++) {
+        bool is_complete = true;
+        for (int j = 0; j < k*(k-1)/2; j++) {
+            if (assign[j] == l_Undef) {
+                is_complete = false;
+                break;
+            }
+        }
+        
+        if (is_complete) {
+            std::string partial_assignment = convert_assignment_to_string(k);
+            
+            if (print_statement) {
+                DEBUG_PRINT("Starting canonicity check for partial assignment of size " << k);
+            }
+
+            std::vector<int> blocking_clause = block_extension(k);
+            
+            if (!blocking_clause.empty()) {
+                if (print_statement) {
+                    DEBUG_PRINT("Partial assignment of size " << k << " is non-canonical");
+                    DEBUG_PRINT("Generated blocking clause: ");
+                    for (int lit : blocking_clause) {
+                        std::cout << "  " << lit;
+                    }
+                    std::cout << std::endl;
+                }
+                
+                new_clauses.push_back(blocking_clause);
+                return true;
+            } else if (print_statement) {
+                DEBUG_PRINT("Partial assignment of size " << k << " is canonical");
+            }
+            
+            // Add geometric realizability check only for complete partial assignments
+            // Similar to canonicity check, we only check when we have a complete assignment of size k
+            if (print_statement) {
+                DEBUG_PRINT("Starting geometric realizability check for partial assignment of size " << k);
+            }
+            
+            const double geo_before = CaDiCaL::absolute_process_time();
+            adjacency_matrix_t partial_matrix = string_to_adjacency_matrix(partial_assignment, k);
+            auto [is_realizable, problem_vertex] = is_geometrically_realizable_with_vertex(partial_matrix);
+
+            if (!is_realizable) {
+                const double geo_after = CaDiCaL::absolute_process_time();
+                geo_check_time += (geo_after - geo_before);
+                geo_infeasible_count++;
+                
+                if (print_statement) {
+                    DEBUG_PRINT("Partial assignment of size " << k << " is not geometrically realizable");
+                    DEBUG_PRINT("Problem vertex: " << problem_vertex);
+                }
+                
+                // Try to generate a minimal blocking clause first
+                std::vector<int> blocking_clause = generate_minimal_geometric_blocking_clause(partial_matrix, problem_vertex);
+                
+                // If minimal blocking clause generation failed, fall back to naive approach
+                if (blocking_clause.empty()) {
+                    blocking_clause = generate_naive_blocking_clause(partial_assignment, true);
+                }
+                
+                if (!blocking_clause.empty() && print_statement) {
+                    DEBUG_PRINT("Generated geometric blocking clause: ");
+                    for (int lit : blocking_clause) {
+                        std::cout << "  " << lit;
+                    }
+                    std::cout << std::endl;
+                }
+                
+                new_clauses.push_back(blocking_clause);
+                return true;
+            } else {
+                const double geo_after = CaDiCaL::absolute_process_time();
+                geo_check_time += (geo_after - geo_before);
+                geo_feasible_count++;
+                
+                if (print_statement) {
+                    DEBUG_PRINT("Partial assignment of size " << k << " is geometrically realizable");
+                }
+            }
+        } else if (print_statement) {
+            DEBUG_PRINT("Partial assignment of size " << k << " is incomplete, stopping checks");
+            break;
+        }
+    }
+
+    if (print_statement) {
+        DEBUG_PRINT("No clauses generated for current partial assignment");
+    }
+
+    return false;
+}
+
+int SymmetryBreaker::cb_add_external_clause_lit () {
+    if (new_clauses.empty()) return 0;
+    else {
+        assert(!new_clauses.empty());
+        size_t clause_idx = new_clauses.size() - 1;
+        if (new_clauses[clause_idx].empty()) {
+            new_clauses.pop_back();
+            return 0;
+        }
+
+        int lit = new_clauses[clause_idx].back();
+        
+        // Print the entire clause when we start adding it
+        if (new_clauses[clause_idx].size() > 1 && print_statement) {
+            std::cout << "DEBUG: Adding blocking clause: ";
+            for (int i = new_clauses[clause_idx].size() - 1; i >= 0; i--) {
+                std::cout << new_clauses[clause_idx][i] << " ";
+            }
+            std::cout << std::endl;
+        }
+        
+        new_clauses[clause_idx].pop_back();
+        return lit;
+    }
+}
+
+int SymmetryBreaker::cb_decide() {
+    return 0;
+}
+
+int SymmetryBreaker::cb_propagate() {
+    return 0;
+}
+
+int SymmetryBreaker::cb_add_reason_clause_lit(int plit) {
+    (void)plit; // Suppress unused parameter warning
+    return 0;
+}
+
+void SymmetryBreaker::printGraph(const graph* g, int n, int m) {
+    if (print_statement) {
+        std::cout << "Graph representation:" << std::endl;
+        for (int i = 0; i < n; i++) {
+            std::cout << "  Node " << i << " connected to: ";
+            for (int j = 0; j < n; j++) {
+                if (ISELEMENT(GRAPHROW(g, i, m), j)) {
+                    std::cout << j << " ";
+                }
+            }
+            std::cout << std::endl;
+        }
+    }
+}
+
+void SymmetryBreaker::initNautyOptions() {
+    options.writeautoms = FALSE;
+    options.writemarkers = FALSE;
+    options.getcanon = TRUE;
+    options.defaultptn = TRUE;
+}
+
+// Modify the generate_complex_blocking_clause function to remove the degree check
+std::vector<int> SymmetryBreaker::generate_complex_blocking_clause(const std::string& assignment, int k) {
+    std::vector<int> blocking_clause;
+    
+    // Find the minimal noncanonical matrix size
+    int minimal_k = k;
+    std::string current_assignment = assignment;
+    
+    while (minimal_k > 1) {
+        std::string submatrix = extract_submatrix(current_assignment, minimal_k - 1);
+        if (isCanonical(submatrix)) {
+            break;
+        }
+        current_assignment = submatrix;
+        minimal_k--;
+    }
+    
+    if (print_statement) {
+        std::cout << "DEBUG: Minimal noncanonical matrix size: " << minimal_k << std::endl;
+        std::cout << "DEBUG: Minimal noncanonical assignment: " << current_assignment << std::endl;
+    }
+    
+    if (minimal_k > 1) {
+        for (size_t i = 0; i < current_assignment.length(); ++i) {
+            int literal = current_assignment[i] == '1' ? -(i + 1) : (i + 1);
+            blocking_clause.push_back(literal);
+        }
+    }
+
+    if (print_statement) {
+        std::cout << "DEBUG: Generated blocking clause: ";
+        for (int lit : blocking_clause) {
+            std::cout << lit << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return blocking_clause;
+}
+
+// Optimize the generate_naive_blocking_clause function to avoid unnecessary string operations
+std::vector<int> SymmetryBreaker::generate_naive_blocking_clause(const std::string& assignment, bool only_true_edges) {
+    std::vector<int> blocking_clause;
+    blocking_clause.reserve(assignment.length()); // Pre-allocate memory
+    
+    // Skip the first 78 variables (indices 0-77)
+    const int skip_vars = EDGE_CUTOFF;
+    
+    for (size_t i = 0; i < assignment.length(); ++i) {
+        // Only include variables with index > 78
+        if (i + 1 > skip_vars) {
+            if (only_true_edges) {
+                // For subgraph blocking, only include TRUE edges
+                if (assignment[i] == '1') {
+                    blocking_clause.push_back(-(i + 1));
+                }
+            } else {
+                // For canonicity blocking, include both TRUE and FALSE edges
+                blocking_clause.push_back(assignment[i] == '1' ? -(i + 1) : (i + 1));
+            }
+        }
+    }
+
+    if (print_statement) {
+        std::cout << "DEBUG: Generated " << (only_true_edges ? "subgraph" : "canonicity") 
+                  << " blocking clause (skipping first " << skip_vars << " variables): ";
+        for (int lit : blocking_clause) {
+            std::cout << lit << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return blocking_clause;
+}
+
+// Optimize the string_to_adjacency_matrix function
+adjacency_matrix_t SymmetryBreaker::string_to_adjacency_matrix(const std::string& input, int k) {
+    adjacency_matrix_t matrix(k, std::vector<truth_value_t>(k, l_False));
+    int index = 0;
+    
+    for (int j = 1; j < k; j++) {
+        for (int i = 0; i < j; i++) {
+            if (index < input.length() && input[index++] == '1') {
+                matrix[i][j] = l_True;
+                matrix[j][i] = l_True;
+            }
+        }
+    }
+    return matrix;
+}
+
+std::string SymmetryBreaker::adjacency_matrix_to_string(const adjacency_matrix_t& matrix) {
+    std::string result;
+    int k = matrix.size();
+    for (int j = 1; j < k; j++) {
+        for (int i = 0; i < j; i++) {
+            result += (matrix[i][j] == l_True) ? '1' : '0';  // Changed to l_True
+        }
+    }
+    return result;
+}
+
+#ifdef GLASGOW
+InputGraph SymmetryBreaker::toGlasgowGraph(const adjacency_matrix_t &adjacencyMatrix, int nVertices) {
+    // Create a labeled graph (set the second parameter to true for vertex labels)
+    InputGraph G(nVertices, true, false);
+    
+    // Assign labels to vertices: 0 for first 13 vertices, 1 for the rest
+    for (int i = 0; i < nVertices; i++) {
+        std::string label = (i < SMALL_GRAPH_ORDER) ? "0" : "1";
+        G.set_vertex_label(i, label);
+    }
+    
+    // Add edges
+    for (int j = 0; j < nVertices; j++) {
+        for (int i = 0; i < j; i++) {  // Only process upper triangle (i < j)
+            if (adjacencyMatrix[i][j] == l_True) {
+                G.add_edge(i, j);
+            }
+        }
+    }
+    return G;
+}
+
+InputGraph SymmetryBreaker::toLabeledGlasgowGraph(const adjacency_matrix_t &adjacencyMatrix, int nVertices) {
+    // Create a graph with both vertex and edge labels
+    InputGraph G(nVertices, true, true);
+    
+    // Assign labels to vertices: 0 for first 13 vertices, 1 for the rest
+    for (int i = 0; i < nVertices; i++) {
+        std::string label = (i < SMALL_GRAPH_ORDER) ? "0" : "1";
+        G.set_vertex_label(i, label);
+    }
+    
+    // Add edges with labels
+    for (int j = 0; j < nVertices; j++) {
+        for (int i = 0; i < j; i++) {  // Only process upper triangle (i < j)
+            if (adjacencyMatrix[i][j] == l_True) {
+                G.add_directed_edge(i, j, PRESENT_LABEL);
+                G.add_directed_edge(j, i, PRESENT_LABEL);
+            } else if (adjacencyMatrix[i][j] == l_False) {
+                G.add_directed_edge(i, j, ABSENT_LABEL);
+                G.add_directed_edge(j, i, ABSENT_LABEL);
+            } else {
+                G.add_directed_edge(i, j, UNKNOWN_LABEL);
+                G.add_directed_edge(j, i, UNKNOWN_LABEL);
+            }
+        }
+    }
+    return G;
+}
+
+InputGraph SymmetryBreaker::toGlasgowGraph_row(const adjacency_matrix_t &adjacencyMatrix, int nVertices) {
+    // Create a labeled graph
+    InputGraph G(nVertices, true, false);
+    
+    // Assign labels to vertices: 0 for first 13 vertices, 1 for the rest
+    for (int i = 0; i < nVertices; i++) {
+        std::string label = (i < SMALL_GRAPH_ORDER) ? "0" : "1";
+        G.set_vertex_label(i, label);
+    }
+    
+    // Add edges
+    for (int i = 0; i < nVertices; i++) {
+        for (int j = i + 1; j < nVertices; j++) {  // Only process upper triangle (j > i)
+            if (adjacencyMatrix[i][j] == l_True) {
+                G.add_edge(i, j);
+            }
+        }
+    }
+    return G;
+}
+#endif
+
+void SymmetryBreaker::load_master_graph(const std::string& filepath) {
+    // Set print_statement to true at the beginning of this function
+    bool original_print_setting = print_statement;
+    print_statement = true;
+    
+    // Check if we've already loaded the master graph
+    if (!masterGraph.empty()) {
+        std::cout << "DEBUG: Master graph already loaded, skipping reload" << std::endl;
+        print_statement = original_print_setting;  // Restore original setting
+        return;
+    }
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open master graph file " << filepath << std::endl;
+        std::cerr << "Current working directory: " << std::filesystem::current_path() << std::endl;
+        print_statement = original_print_setting;  // Restore original setting
+        return;
+    }
+
+    // Basic implementation for .lad format
+    std::string line;
+    std::getline(file, line); // Read the first line (number of vertices)
+    int n = std::stoi(line);
+    masterGraph = adjacency_matrix_t(n, std::vector<truth_value_t>(n, l_False));
+    
+    // Store vertex labels
+    std::vector<int> vertexLabels(n);
+
+    for (int i = 0; i < n; i++) {
+        std::getline(file, line);
+        std::istringstream iss(line);
+        
+        int label;
+        iss >> label;  // Read the first number as the vertex label
+        vertexLabels[i] = label;
+        
+        int degree;
+        iss >> degree;  // Read the number of successors
+        
+        for (int j = 0; j < degree; j++) {
+            int neighbor;
+            iss >> neighbor;
+            masterGraph[i][neighbor] = l_True;
+            masterGraph[neighbor][i] = l_True;  // For undirected graph
+        }
+    }
+
+    if (print_statement) {
+        std::cout << "DEBUG: Loaded master graph with " << n << " vertices" << std::endl;
+        std::cout << "DEBUG: Vertex labels: ";
+        for (int i = 0; i < n; i++) {
+            std::cout << vertexLabels[i] << " ";
+        }
+        std::cout << std::endl;
+        
+        // Print out connections for each vertex
+        std::cout << "DEBUG: Master graph connections:" << std::endl;
+        for (int i = 0; i < n; i++) {
+            std::cout << "Vertex " << i << " (label " << vertexLabels[i] << ") connects to: ";
+            bool first = true;
+            for (int j = 0; j < n; j++) {
+                if (masterGraph[i][j] == l_True) {
+                    if (!first) {
+                        std::cout << ", ";
+                    }
+                    std::cout << j;
+                    first = false;
+                }
+            }
+            std::cout << std::endl;
+        }
+    }
+    
+    // Store vertex labels as a member variable for later use
+    masterGraphLabels = vertexLabels;
+    use_master_graph = true;
+    
+    // Restore original print_statement setting at the end
+    print_statement = original_print_setting;
+}
+
+bool SymmetryBreaker::is_subgraph_of_master(const adjacency_matrix_t& graph) {
+    // Add timer start
+    const double before = CaDiCaL::absolute_process_time();
+
+#ifdef GLASGOW
+    // Cache the GSS graphs to avoid recreating them each time
+    static std::unique_ptr<InputGraph> H_ptr = nullptr;
+    static bool master_graph_converted = false;
+
+    if (print_statement) {
+        std::cout << "DEBUG: Entering is_subgraph_of_master" << std::endl;
+        std::cout << "DEBUG: GSS is available" << std::endl;
+    }
+
+    if (masterGraph.empty()) {
+        std::cerr << "Error: Master graph not loaded" << std::endl;
+        // Add timer end for error case
+        const double after = CaDiCaL::absolute_process_time();
+        subgraph_check_time += (after - before);
+        return false;
+    }
+
+    // Convert the master graph to GSS format only once
+    if (!master_graph_converted) {
+        H_ptr = std::make_unique<InputGraph>(toGlasgowGraph_row(masterGraph, (int)masterGraph.size()));
+        master_graph_converted = true;
+        
+        if (print_statement) {
+            std::cout << "DEBUG: Converted master graph to Glasgow format" << std::endl;
+            std::cout << "DEBUG: Master graph has " << H_ptr->size() << " vertices" << std::endl;
+        }
+    }
+
+    if (print_statement) {
+        std::cout << "DEBUG: Checking if graph of size " << graph.size() 
+                  << " is a subgraph of the master graph" << std::endl;
+    }
+
+    // Convert the pattern graph to GSS format
+    InputGraph G = toGlasgowGraph(graph, (int)graph.size());
+
+    if (print_statement) {
+        std::cout << "DEBUG: Created labeled Glasgow graph for pattern" << std::endl;
+        std::cout << "DEBUG: Pattern graph has " << G.size() << " vertices" << std::endl;
+    }
+
+    // Use GSS to check if G is a subgraph of H, respecting vertex labels
+    HomomorphismResult res = solve_homomorphism_problem(G, *H_ptr, defaultHomParams);
+
+    // Add timer end
+    const double after = CaDiCaL::absolute_process_time();
+    subgraph_check_time += (after - before);
+
+    if (!res.mapping.empty()) {
+        if (print_statement) {
+            std::cout << "DEBUG: Found match" << std::endl;
+            std::cout << "DEBUG: Mapping: ";
+            for (size_t i = 0; i < res.mapping.size(); i++) {
+                std::cout << i << "->" << res.mapping[i] << " ";
+            }
+            std::cout << std::endl;
+        }
+        return true;
+    }
+
+    if (print_statement) {
+        std::cout << "DEBUG: No match found" << std::endl;
+    }
+    return false;
+#else
+    std::cerr << "Error: GSS not available" << std::endl;
+    
+    // Add timer end for error case
+    const double after = CaDiCaL::absolute_process_time();
+    subgraph_check_time += (after - before);
+    
+    return false;
+#endif
+}
+
+void SymmetryBreaker::print_subgraph_statistics() {
+    std::cout << "c Subgraph Statistics:" << std::endl;
+    std::cout << "c   Partial assignments that are subgraphs: " << subgraph_count << std::endl;
+    std::cout << "c   Partial assignments that are not subgraphs: " << non_subgraph_count << std::endl;
+    std::cout << "c   Total subgraph checking time: " << subgraph_check_time << " s" << std::endl;
+}
+
+// Check if three vectors are linearly independent
+bool SymmetryBreaker::are_linearly_independent(const std::array<double, 3>& v1, 
+                                              const std::array<double, 3>& v2, 
+                                              const std::array<double, 3>& v3) {
+    // Compute the determinant of the matrix formed by these vectors
+    double det = v1[0] * (v2[1] * v3[2] - v2[2] * v3[1]) -
+                 v1[1] * (v2[0] * v3[2] - v2[2] * v3[0]) +
+                 v1[2] * (v2[0] * v3[1] - v2[1] * v3[0]);
+    
+    bool result = std::abs(det) > 1e-10;
+    
+    if (print_statement) {
+        std::cout << "DEBUG: Checking linear independence of vectors: " 
+                  << "(" << v1[0] << "," << v1[1] << "," << v1[2] << "), "
+                  << "(" << v2[0] << "," << v2[1] << "," << v2[2] << "), "
+                  << "(" << v3[0] << "," << v3[1] << "," << v3[2] << ")" << std::endl;
+        std::cout << "DEBUG: Determinant = " << det << ", vectors are " 
+                  << (result ? "linearly independent" : "linearly dependent") << std::endl;
+    }
+    
+    return result;
+}
+
+// Add this function to generate a minimal blocking clause for geometric infeasibility
+std::vector<int> SymmetryBreaker::generate_minimal_geometric_blocking_clause(const adjacency_matrix_t& matrix, int new_vertex) {
+    std::vector<int> blocking_clause;
+    
+    // Collect indices of SIC vectors that the new vertex must be orthogonal to
+    std::vector<int> orthogonal_indices;
+    for (int i = 0; i < SMALL_GRAPH_ORDER; i++) {
+        if (matrix[i][new_vertex] == l_True) {
+            orthogonal_indices.push_back(i);
+        }
+    }
+    
+    if (print_statement) {
+        std::cout << "DEBUG: Vertex " << new_vertex << " has " << orthogonal_indices.size() 
+                  << " orthogonality constraints" << std::endl;
+    }
+    
+    // Find a minimal set of three linearly independent vectors
+    for (size_t i = 0; i < orthogonal_indices.size(); i++) {
+        for (size_t j = i + 1; j < orthogonal_indices.size(); j++) {
+            for (size_t k = j + 1; k < orthogonal_indices.size(); k++) {
+                int idx_i = orthogonal_indices[i];
+                int idx_j = orthogonal_indices[j];
+                int idx_k = orthogonal_indices[k];
+                
+                if (are_linearly_independent(SIC_VECTORS[idx_i], 
+                                           SIC_VECTORS[idx_j], 
+                                           SIC_VECTORS[idx_k])) {
+                    // Found three linearly independent vectors - create a minimal blocking clause
+                    // Calculate the correct variable indices
+                    int var_i = idx_i < new_vertex ? 
+                               new_vertex*(new_vertex-1)/2 + idx_i : 
+                               idx_i*(idx_i-1)/2 + new_vertex;
+                    
+                    int var_j = idx_j < new_vertex ? 
+                               new_vertex*(new_vertex-1)/2 + idx_j : 
+                               idx_j*(idx_j-1)/2 + new_vertex;
+                    
+                    int var_k = idx_k < new_vertex ? 
+                               new_vertex*(new_vertex-1)/2 + idx_k : 
+                               idx_k*(idx_k-1)/2 + new_vertex;
+                    
+                    blocking_clause.push_back(-(var_i + 1));
+                    blocking_clause.push_back(-(var_j + 1));
+                    blocking_clause.push_back(-(var_k + 1));
+                    
+                    if (print_statement) {
+                        std::cout << "DEBUG: Generated minimal geometric blocking clause for vertex " << new_vertex 
+                                  << " with edges to vertices " << idx_i << ", " 
+                                  << idx_j << ", " << idx_k << std::endl;
+                        std::cout << "DEBUG: Corresponding to variables " << var_i + 1 << ", " 
+                                  << var_j + 1 << ", " << var_k + 1 << std::endl;
+                    }
+                    
+                    return blocking_clause;
+                }
+            }
+        }
+    }
+    
+    // If we didn't find a minimal set, fall back to the naive approach
+    if (print_statement) {
+        std::cout << "DEBUG: No minimal blocking clause found, falling back to naive approach" << std::endl;
+    }
+    
+    return std::vector<int>();
+}
+
+// Modify the is_geometrically_realizable function to return the problematic vertex
+std::pair<bool, int> SymmetryBreaker::is_geometrically_realizable_with_vertex(const adjacency_matrix_t& matrix) {
+    int n = matrix.size();
+    
+    if (print_statement) {
+        std::cout << "DEBUG: Checking geometric realizability for a matrix of size " << n << std::endl;
+    }
+    
+    // If we only have the first 13 vertices, it's always realizable
+    if (n <= SMALL_GRAPH_ORDER) {
+        if (print_statement) {
+            std::cout << "DEBUG: Matrix only contains the first 13 vertices, always realizable" << std::endl;
+        }
+        return {true, -1};
+    }
+    
+    // For each vertex beyond the first 13, check if it's constrained to be
+    // orthogonal to more than 2 linearly independent vectors
+    for (int new_vertex = SMALL_GRAPH_ORDER; new_vertex < n; new_vertex++) {
+        if (print_statement) {
+            std::cout << "DEBUG: Checking constraints for vertex " << new_vertex << std::endl;
+        }
+        
+        // Collect vectors that the new vertex must be orthogonal to
+        std::vector<std::array<double, 3>> orthogonal_vectors;
+        std::vector<int> orthogonal_indices;
+        
+        for (int i = 0; i < SMALL_GRAPH_ORDER; i++) {
+            if (matrix[i][new_vertex] == l_True) {
+                orthogonal_vectors.push_back(SIC_VECTORS[i]);
+                orthogonal_indices.push_back(i);
+                if (print_statement) {
+                    std::cout << "DEBUG: Vertex " << new_vertex << " must be orthogonal to vertex " << i 
+                              << " with vector (" << SIC_VECTORS[i][0] << "," 
+                              << SIC_VECTORS[i][1] << "," << SIC_VECTORS[i][2] << ")" << std::endl;
+                }
+            }
+        }
+        
+        if (print_statement) {
+            std::cout << "DEBUG: Vertex " << new_vertex << " has " << orthogonal_vectors.size() 
+                      << " orthogonality constraints" << std::endl;
+        }
+        
+        // If orthogonal to 3 or more vectors, check if any 3 are linearly independent
+        if (orthogonal_vectors.size() >= 3) {
+            if (print_statement) {
+                std::cout << "DEBUG: Checking for linear independence among " 
+                          << orthogonal_vectors.size() << " vectors" << std::endl;
+            }
+            
+            for (size_t i = 0; i < orthogonal_vectors.size(); i++) {
+                for (size_t j = i + 1; j < orthogonal_vectors.size(); j++) {
+                    for (size_t k = j + 1; k < orthogonal_vectors.size(); k++) {
+                        if (print_statement) {
+                            std::cout << "DEBUG: Testing triplet (" << orthogonal_indices[i] << "," 
+                                      << orthogonal_indices[j] << "," << orthogonal_indices[k] << ")" << std::endl;
+                        }
+                        
+                        if (are_linearly_independent(orthogonal_vectors[i], 
+                                                    orthogonal_vectors[j], 
+                                                    orthogonal_vectors[k])) {
+                            if (print_statement) {
+                                std::cout << "DEBUG: Vertex " << new_vertex 
+                                          << " is constrained to be orthogonal to 3 linearly independent vectors"
+                                          << std::endl;
+                                std::cout << "DEBUG: This is impossible in 3D space, rejecting assignment" << std::endl;
+                            }
+                            return {false, new_vertex};
+                        }
+                    }
+                }
+            }
+            
+            if (print_statement) {
+                std::cout << "DEBUG: No linearly independent triplet found among orthogonality constraints" << std::endl;
+            }
+        }
+    }
+    
+    if (print_statement) {
+        std::cout << "DEBUG: Assignment is geometrically realizable" << std::endl;
+    }
+    
+    return {true, -1};
+}
+
+// Keep the original function for backward compatibility
+bool SymmetryBreaker::is_geometrically_realizable(const adjacency_matrix_t& matrix) {
+    return is_geometrically_realizable_with_vertex(matrix).first;
+}
+
+// Add this function to print geometric feasibility statistics
+void SymmetryBreaker::print_geometric_statistics() {
+    std::cout << "c Geometric Feasibility Statistics:" << std::endl;
+    std::cout << "c   Geometrically feasible assignments: " << geo_feasible_count << std::endl;
+    std::cout << "c   Geometrically infeasible assignments: " << geo_infeasible_count << std::endl;
+    std::cout << "c   Total geometric checking time: " << geo_check_time << " s" << std::endl;
+    fflush(stdout);
+}

@@ -45,6 +45,19 @@ if [ "$solver" = "-cadical" ]; then
     else
         ./cadical-ks/build/cadical-ks $f --proofsize 7168 -t $t | tee $f.log
     fi
+elif [ "$solver" = "-cadical-nauty" ]; then
+    # Set default values
+    partition_val=25
+    ortho=true
+    
+    # Construct solver command based on options
+    cmd="./cadical-rcl/build/cadical $f"
+    cmd="$cmd --order $n --unembeddable-check 0"
+    [ -n "$partition_val" ] && cmd="$cmd --partition $partition_val"
+    [ "$ortho" = true ] && cmd="$cmd --ortho"
+    
+    echo "Executing command: $cmd" | tee $f.log
+    eval $cmd 2>&1 | tee -a $f.log
 elif [ "$solver" = "-maplesat" ]; then
     if [ "$mode" = "-cas" ]; then
         ./maplesat-ks/simp/maplesat_static $f -order=$n -no-pre -minclause -exhaustive=$f.exhaust -max-proof-size=7168 -cpu-lim=$t | tee $f.log
@@ -57,6 +70,6 @@ elif [ "$solver" = "-maplesat" ]; then
         ./maplesat-ks/simp/maplesat_static $f -no-pre -max-proof-size=7168 -cpu-lim=$t | tee $f.log
     fi
 else
-    echo "Invalid solver option. Use -cadical or -maplesat"
+    echo "Invalid solver option. Use -cadical, -cadical-nauty, or -maplesat"
     exit 1
 fi

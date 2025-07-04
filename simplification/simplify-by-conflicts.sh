@@ -24,7 +24,19 @@ output_ext="${input_file}.ext"
 # Run the appropriate solver based on the mode
 if [ "$mode" = "-cas" ]; then
     echo "Running simplification with CAS mode"
-    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
+    # Set default values for cadical-nauty
+    partition_val=25
+    ortho=true
+    
+    # Construct solver command based on options
+    cmd="./cadical-rcl/build/cadical $input_file"
+    cmd="$cmd --order $order --unembeddable-check 0"
+    [ -n "$partition_val" ] && cmd="$cmd --partition $partition_val"
+    [ "$ortho" = true ] && cmd="$cmd --ortho"
+    cmd="$cmd -c $num_conflicts -o $output_file -e $output_ext"
+    
+    echo "Executing command: $cmd" | tee "$output_log"
+    eval $cmd 2>&1 | tee -a "$output_log"
     # Output final simplified instance
     ./gen_cubes/concat-edge.sh $order "$output_file" "$output_ext" > "${output_file}.tmp" && mv "${output_file}.tmp" "$output_file"
 elif [ "$mode" = "-exhaustive-no-cas" ]; then
