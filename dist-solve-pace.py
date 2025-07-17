@@ -182,6 +182,7 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
                     comm.isend(job, dest=i, tag=0)
                     requests.append(comm.irecv(source=i, tag=0))
                     workers[i] = 1
+            print("workers:", sum(workers), "/", size-1, flush=True)
             if requests:
                 jobs = MPI.Request.waitany(requests, status)
                 requests.pop(jobs[0])
