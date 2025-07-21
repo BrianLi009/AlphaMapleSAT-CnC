@@ -34,38 +34,37 @@ This repository contains a collection of scripts and tools for generating and ve
 
 The pipeline depends on MapleSAT-ks, CaDiCaL-ks, NetworkX, z3-solver, and AlphaMapleSAT. Run `dependency-setup.sh` for dependency setup.
 
+## PACE Guideline
 
-## Frontier Guideline
-`maple_setup.sh`
-
+#### Setup
 ```
-module use /ccs/proj/csc607/cray-openshmemx/modulefiles
-module purge
-module load PrgEnv-cray/8.3.3
-module load craype-x86-trento
-module load cray-openshmemx/11.7.2.3
-module load cray-pmi
-module load cray-mrnet
-module load xpmem
-#module load perftools-base
-module load cray-python/3.10.10
-module load valgrind4hpc
-module unload darshan-runtime
-module unload hsi
-module unload DefApps
-module unload cray-libsci
-module load cray-fix
-
-PROJ_DIR=/ccs/proj/csc607
-export PLATFORM=cray
-
-if [ ! -d AlphaMapleSAT2 ]; then
-    git clone https://github.com/BrianLi009/AlphaMapleSAT2/
-    cd AlphaMapleSAT2/
-    pip3 install -r alpha-zero-general/requirements.txt
-    cd march
-    make
-    cd ..
-    source dependency-setup.sh 
-fi
+git clone https://github.com/BrianLi009/AlphaMapleSAT-CnC
+cd AlphaMapleSAT-CnC
+git checkout dist-solve
+salloc -N 2 --ntasks-per-node=24 -A gts-vsarkar9-forza -t06:00:00 --mem-per-cpu=4gb
+module load gcc/12.3.0
+module load openmpi/4.1.5
+module load py-mpi4py/3.1.4-ompi
+python -m venv  --symlinks --system-site-packages .
+source bin/activate
+sh dependency-setup.sh
+pip install numpy matplotlib pysat python-sat psutil coloredlogs
+pip install -r alpha-zero-general/requirements.txt
 ```
+
+#### Execution
+```
+cd AlphaMapleSAT-CnC
+salloc -N <NODES> --ntasks-per-node=24 -A gts-vsarkar9-forza -t06:00:00 --mem-per-cpu=4gb
+
+module load gcc/12.3.0
+module load openmpi/4.1.5
+module load py-mpi4py/3.1.4-ompi
+source bin/activate
+
+srun bash -c "source bin/activate && python dist-solve-pace.py <KS> instances/<filename> -m <C(KS, 2)> --solving-mode satcas --cubing-mode ams --timeout 7200 --cutoff=v --cutoffv=<C(KS, 2)*p>" &> log.txt
+cat log.txt | grep "workers"
+./summary.sh ./instances 7200
+```
+
+> Record the summary with varying salloc `nodes` and `p` for KS-17,19,20,21. 
