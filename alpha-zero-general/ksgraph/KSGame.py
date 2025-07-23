@@ -16,6 +16,8 @@ import hashlib
 
 from ksgraph.EvalVarCalc import Node, MarchPysatPropagate
 
+import time
+
 def calculate_hash(string):
     sha256_hash = hashlib.sha256()
     sha256_hash.update(string.encode('utf-8'))
@@ -25,7 +27,10 @@ class KSGame(Game):
     def __init__(self, args, filename): 
         super(KSGame, self).__init__()
         self.args = args
+        start_time = time.time() 
         self.cnf = CNF(from_file=filename)
+        end_time = time.time() - start_time
+        print("file I/O time elapsed: ", round(end_time, 3))
         self.MAX_LITERALS = args.MAX_LITERALS
         self.STATE_SIZE = args.STATE_SIZE
 

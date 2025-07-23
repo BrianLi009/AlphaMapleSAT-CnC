@@ -1,6 +1,7 @@
 import argparse
 import os
 import subprocess
+import time
 
 import mpi4py
 from mpi4py import MPI
@@ -18,8 +19,11 @@ def simplify(file, order):
     subprocess.run(command, shell=True)
 
 def gen_cube(instance, cube, index):
+    start_t = time.time()
     command = f"./gen_cubes/apply.sh {instance} {cube} {index} > {cube}{index}.cnf"
     subprocess.run(command, shell=True)
+    end_t = time.time() - start_t
+    print("time elapsed during gen_cube", round(end_t, 3))
 
 def solve(file, order, timeout):
     command = f"./solve.sh {order} -cadical {timeout} -cas {file}"
@@ -51,6 +55,7 @@ def cube(instance, cube, index, m, order, numMCTS, timeout, cutoff="d", cutoffv=
         simplog_file = f"{cube}{index}.cnf.simplog"
         file_to_check = f"{cube}{index}.cnf.ext"
 
+    start_t = time.time()
     # Check if the output contains "c exit 20"
     with open(simplog_file, "r") as file:
         if "c exit 20" in file.read():
@@ -58,11 +63,19 @@ def cube(instance, cube, index, m, order, numMCTS, timeout, cutoff="d", cutoffv=
             if cube != "N":
                 files_to_remove = [f'{cube}{index}.cnf', file_to_cube, file_to_check]
                 #remove_related_files(files_to_remove)
+            end_t = time.time() - start_t
+            print("time elapsed during simplog parse", round(end_t, 3))
             return []
-        
+        else:
+            end_t = time.time() - start_t
+            print("time elapsed during simplog parse", round(end_t, 3))
+
+    start_t = time.time()
     command = f"sed -E 's/.* 0 [-]*([0-9]*) 0$/\\1/' < {file_to_check} | awk '$0<={m}' | sort | uniq | wc -l"
     result = subprocess.run(command, shell=True, text=True, capture_output=True)
     var_removed = int(result.stdout.strip())
+    end_t = time.time() - start_t
+    print("time elapsed during var_removed parse", round(end_t, 3))
     if extension == "True":
         if cutoff == 'v':
             cutoffv = var_removed + 20
@@ -182,7 +195,7 @@ def main(order, file_name_solve, m, solving_mode="other", cubing_mode="march", n
                     comm.isend(job, dest=i, tag=0)
                     requests.append(comm.irecv(source=i, tag=0))
                     workers[i] = 1
-            print("workers:", sum(workers), "/", size-1, flush=True)
+            print(round(time.time(), 4), "workers:", sum(workers), "/", size-1, flush=True)
             if requests:
                 jobs = MPI.Request.waitany(requests, status)
                 requests.pop(jobs[0])
