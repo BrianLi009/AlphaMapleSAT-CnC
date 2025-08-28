@@ -13,20 +13,9 @@ AlphaMapleSAT is a novel Monte Carlo Tree Search (MCTS) based Cube-and-Conquer (
 
 1. Clone this repository
 
-2. Run the dependency setup script:
+2. Run the dependency setup script. (Note: this also sets up the AlphaMapleSAT cubing tool. Create a new virtual environment and use Python 3.10 for optimal compatibility):
 ```bash
 ./dependency-setup.sh
-```
-
-3. Set up the AlphaMapleSAT cubing tool (Use Python 3.10 for optimal compatibility):
-```bash
-virtualenv --no-download ams_env
-source ams_env/bin/activate
-
-git clone https://github.com/piyush-J/AlphaMapleSAT.git
-cd alphamaplesat
-pip install --upgrade pip
-pip install -r requirements.txt
 ```
 
 ## Usage
@@ -37,12 +26,12 @@ The main script for running the pipeline is `parallel-solve.py`. It supports var
 
 #### Example Command:
 ```bash
-python3 parallel-solve.py 17 ks_17.cnf -m 136 --solving-mode satcas --cubing-mode ams --timeout 7200
+python3 parallel-solve.py 17 instances/ks_17.cnf -m 136 --solving-mode satcas --cubing-mode ams --timeout 7200 --cutoff v --cutoffv 40 > out.log
 ```
 
 ### Metrics Summary: `summary.sh`
 
-After running the pipeline, use `summary.sh` to analyze cubing and solving metrics.
+After running `parallel-solve.py`, copy `out.log` to the `instances` folder and use `summary.sh` to analyze cubing and solving metrics.
 
 #### Example Command:
 ```bash
@@ -56,7 +45,7 @@ Ensure each instance has its own folder for better organization.
 To run the cubing tool independently:
 ```bash
 source ams_env/bin/activate
-cd alphamaplesat
+cd AlphaMapleSAT/alphamaplesat
 python -u main.py "constraints_17_c_100000_2_2_0_final.simp" -d 1 -m 136 -o "test.cubes" -prod
 ```
 
