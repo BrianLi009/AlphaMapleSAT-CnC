@@ -1,0 +1,9 @@
+*.out
+bin
+lib
+lib64
+pyvenv.cfg
+instances/ks_17.cnf.*
+instances/ks_19.cnf*
+instances/MathCheck
+share

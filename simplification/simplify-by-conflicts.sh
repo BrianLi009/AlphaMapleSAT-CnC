@@ -24,9 +24,11 @@ output_ext="${input_file}.ext"
 # Run the appropriate solver based on the mode
 if [ "$mode" = "-cas" ]; then
     echo "Running simplification with CAS mode"
-    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
+    ./cadical-ks/build/cadical-ks "$input_file" --order "$order" -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"	
+	ec="${PIPESTATUS[0]}"
     # Output final simplified instance
     ./gen_cubes/concat-edge.sh $order "$output_file" "$output_ext" > "${output_file}.tmp" && mv "${output_file}.tmp" "$output_file"
+	exit "$ec"
 elif [ "$mode" = "-exhaustive-no-cas" ]; then
     echo "Running simplification with exhaustive search mode (no CAS)"
     ./cadical-ks/build/cadical-ks "$input_file" --order "$order" --exhaustive -c "$num_conflicts" -o "$output_file" -e "$output_ext" | tee "$output_log"
