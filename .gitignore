@@ -1,4 +1,5 @@
 *.out
+dist-solve
 bin
 lib
 lib64

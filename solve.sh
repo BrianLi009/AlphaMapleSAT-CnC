@@ -31,6 +31,8 @@ Arguments:
 if [ "$solver" = "-cadical" ]; then
     if [ "$mode" = "-cas" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --proofsize 7168 -t $t | tee $f.log
+        ec="${PIPESTATUS[0]}"
+        exit "$ec"
     elif [ "$mode" = "-exhaustive-no-cas" ]; then
         ./cadical-ks/build/cadical-ks $f --order $n --exhaustive --proofsize 7168 -t $t | tee $f.log
     elif [ "$mode" = "-sms" ]; then
