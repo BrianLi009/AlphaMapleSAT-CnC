@@ -7,6 +7,8 @@
 #include <vector>
 #include <queue>
 
+#include <time.h>
+
 #include <mpi.h>
 
 #define SIMP_NCONF 10000
@@ -77,7 +79,7 @@ Cube::Cube(std::string& cubestr, int order) {
         this->cube = cnf + "." + id + ".cube";
     }
     this->order = order;
-    printf("%s %s %s %s %d %d %d\n", cnf.c_str(), cube.c_str(), id.c_str(), index.c_str(), cutoffv, d, status);
+    //printf("%s %s %s %s %d %d %d\n", cnf.c_str(), cube.c_str(), id.c_str(), index.c_str(), cutoffv, d, status);
 }
 
 // add the cube variable to CNF
@@ -91,7 +93,7 @@ void Cube::apply() {
     cmd << cnf << " " << cube << " " << index << " > ";
     cmd << cnf << "." << id << index << ".cnf";
 
-    printf("%s\n", cmd.str().c_str());
+    //printf("%s\n", cmd.str().c_str());
     system(cmd.str().c_str());
 
     std::stringstream ss;
@@ -283,6 +285,8 @@ int main(int argc, char** argv) {
         requests.resize(size);
         recvlen.resize(size);
 
+        auto start = MPI_Wtime();
+
         int working = 0;
 
         // top level problem
@@ -292,23 +296,36 @@ int main(int argc, char** argv) {
             requests[i] = MPI_REQUEST_NULL;
         }
 
+        bool startup = true;
+        int ncubes = 1;
+
         for (;;) {
             // get first available worker
             for (int i = 1; i < size; i++) {
-                //printf("cubestack size: %d\n", cubestack.size());
                 if (cubestack.size() == 0) {
                     break;
                 }
                 if (!workers[i]) {
                     working++;
-                    std::string cube = cubestack.front().str();
+                    std::string cubestr = cubestack.front().str();
                     cubestack.pop();
-                    isend_cube(i, cube);
-                    //printf("rank %d sending \"%s\"\n", rank, cube.c_str());
+                    Cube cube(cubestr, order);
+                    if (startup && ncubes < size-1) {
+                        //printf("forcing cubing of cube '%s'\n", cube.str().c_str());
+                        cube.set_status(CUBE);
+                    }
+                    if (startup && ncubes >= size-1) {
+                        startup = false;
+                    }
+                    ncubes--;
+                    isend_cube(i, cube.str());
                     workers[i] = true;
                     MPI_Irecv(&(recvlen.data()[i]), 1, MPI_INT, i, 0, MPI_COMM_WORLD, &(requests.data()[i]));
                 }
             }
+
+            auto now = MPI_Wtime();
+            printf("(WORKERTIMESTAMP) %.2f %d\n", now-start, working);
 
             // check if recieved completion from workers
             int idx;
@@ -332,6 +349,7 @@ int main(int argc, char** argv) {
                     std::string cube;
                     std::getline(ss, cube, ',');
                     cubestack.push(Cube(cube, order));
+                    ncubes++;
                 }
             }
         }
