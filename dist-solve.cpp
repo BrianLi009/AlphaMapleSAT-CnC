@@ -7,8 +7,10 @@
 #include <vector>
 #include <queue>
 #include <fstream>
-
+#include <set>
 #include <time.h>
+#include <cstdlib>
+#include <regex>
 
 #include <mpi.h>
 
@@ -201,22 +203,33 @@ int Cube::simplify(bool ext, char cutoff) {
     simp_inst = instance + ".simp";
     if (WEXITSTATUS(status) == UNSAT) { return UNSAT; }
 
-    // get vars removed
-    int var_removed;
-    std::stringstream vcmd;
-    vcmd << "sed -E 's/.* 0 [-]*([0-9]*) 0$/\\1/' < ";
-    vcmd << instance << ".ext ";
-    vcmd << "| awk '$0<=" << order*(order-1)/2 << "' ";
-    vcmd << "| sort | uniq | wc -l";
-    FILE* fp = popen(vcmd.str().c_str(), "r");
-    fscanf(fp, "%d", &var_removed);
+    const std::string ext_file = instance + ".ext";
+    std::ifstream fin(ext_file);
+    if (!fin)
+        throw std::runtime_error("simplify: cannot open file " + ext_file);
 
-    if (ext) {
-        if (cutoff == 'v') {
-            cutoffv = var_removed + 20;
-        } else {
-            cutoffv = cutoffv + 5;
+    std::set<int> vars; 
+    std::regex pattern(R"(.* 0 [-]*([0-9]+) 0$)");
+    std::string line;
+    const int maxvar = order * (order - 1) / 2;
+
+    while (std::getline(fin, line)) {
+        std::smatch m;
+        if (std::regex_match(line, m, pattern)) {
+            int val = std::stoi(m[1].str());
+            if (val <= maxvar) vars.insert(val);
         }
+    }
+
+    fin.close();
+    int var_removed = static_cast<int>(vars.size());
+
+    // --- Apply cutoff logic ---
+    if (ext) {
+        if (cutoff == 'v')
+            cutoffv = var_removed + 20;
+        else
+            cutoffv += 5;
     }
 
     if (cutoff == 'd') {
@@ -230,6 +243,7 @@ int Cube::simplify(bool ext, char cutoff) {
             return UNKNOWN;
         }
     }
+
     status = CUBE;
     return UNKNOWN;
 }
