@@ -6,6 +6,7 @@
 #include <cstring>
 #include <vector>
 #include <queue>
+#include <fstream>
 
 #include <time.h>
 
@@ -82,26 +83,115 @@ Cube::Cube(std::string& cubestr, int order) {
     //printf("%s %s %s %s %d %d %d\n", cnf.c_str(), cube.c_str(), id.c_str(), index.c_str(), cutoffv, d, status);
 }
 
-// add the cube variable to CNF
+static inline std::string trim(const std::string &s) {
+    size_t b = 0, e = s.size();
+    while (b < e && std::isspace(static_cast<unsigned char>(s[b]))) ++b;
+    while (e > b && std::isspace(static_cast<unsigned char>(s[e-1]))) --e;
+    return s.substr(b, e - b);
+}
+
+static std::vector<std::string> split_ws(const std::string &line) {
+    std::istringstream iss(line);
+    std::vector<std::string> tok;
+    std::string t;
+    while (iss >> t) tok.push_back(t);
+    return tok;
+}
+
 void Cube::apply() {
-    if (cube == "") {
+    // If no cube file path was specified, keep the original instance.
+    if (cube.empty()) {
         instance = cnf;
         return;
     }
-    std::stringstream cmd;
-    cmd << "./gen_cubes/apply.sh ";
-    cmd << cnf << " " << cube << " " << index << " > ";
-    cmd << cnf << "." << id << index << ".cnf";
 
-    //printf("%s\n", cmd.str().c_str());
-    system(cmd.str().c_str());
+    // Parse 1-based index from string
+    if (index.empty())
+        throw std::runtime_error("Cube::apply: 'index' must be non-empty (1-based).");
+    long long cube_idx = 0;
+    try {
+        cube_idx = std::stoll(index);
+    } catch (...) {
+        throw std::runtime_error("Cube::apply: 'index' is not a valid integer: " + index);
+    }
+    if (cube_idx <= 0) {
+        throw std::runtime_error("Cube::apply: 'index' must be >= 1 (one-based).");
+    }
 
-    std::stringstream ss;
-    ss << cnf << "." << id << index << ".cnf";
-    instance = ss.str();
+    // Open CNF file and read header (assumes header is the first line, like the script)
+    std::ifstream fin_cnf(cnf);
+    if (!fin_cnf)
+        throw std::runtime_error("Cube::apply: cannot open CNF file: " + cnf);
+
+    std::string header;
+    if (!std::getline(fin_cnf, header))
+        throw std::runtime_error("Cube::apply: empty CNF file: " + cnf);
+
+    // Parse "p cnf <numvars> <numclauses>"
+    {
+        std::istringstream hs(header);
+        std::string p, cnf_kw;
+        long long numvars = 0, numclauses = 0;
+        if (!(hs >> p >> cnf_kw >> numvars >> numclauses) || p != "p" || cnf_kw != "cnf")
+            throw std::runtime_error("Cube::apply: CNF header not in 'p cnf V C' format: " + header);
+
+        // Read the i-th line from cube file
+        std::ifstream fin_cube(cube);
+        if (!fin_cube)
+            throw std::runtime_error("Cube::apply: cannot open cube file: " + cube);
+
+        std::string chosen_line;
+        {
+            long long line_no = 0;
+            for (std::string line; std::getline(fin_cube, line); ) {
+                if (++line_no == cube_idx) {
+                    chosen_line = trim(line);
+                    break;
+                }
+            }
+            if (chosen_line.empty())
+                throw std::runtime_error("Cube::apply: cube index " + std::to_string(cube_idx) +
+                                         " exceeds number of lines in " + cube);
+        }
+
+        // Tokenize chosen cube line and drop first and last token (like the bash pipeline)
+        //   head -n i | tail -n 1 | xargs -n 1 | tail -n +2 | head -n -1
+        std::vector<std::string> toks = split_ws(chosen_line);
+        std::vector<std::string> unit_literals;
+        if (toks.size() >= 2) {
+            // keep tokens [1 .. size-2] if size >= 2; if size==2, result empty (no units)
+            for (size_t k = 1; k + 1 < toks.size(); ++k)
+                unit_literals.push_back(toks[k]);
+        }
+        // new clause count
+        long long new_numclauses = numclauses + static_cast<long long>(unit_literals.size());
+
+        // Prepare output file name: <cnf>.<id><index>.cnf
+        std::string out_name = cnf + "." + id + index + ".cnf";
+        std::ofstream fout(out_name);
+        if (!fout)
+            throw std::runtime_error("Cube::apply: cannot create output file: " + out_name);
+
+        // Write new header
+        fout << "p cnf " << numvars << " " << new_numclauses << "\n";
+
+        // Copy remainder of original CNF (everything after the first line) verbatim
+        // Note: we already consumed one line from fin_cnf (the header).
+        for (std::string line; std::getline(fin_cnf, line); )
+            fout << line << "\n";
+
+        // Append each literal as a unit clause "<lit> 0"
+        for (const auto &lit : unit_literals)
+            fout << lit << " 0\n";
+
+        fout.flush();
+        if (!fout)
+            throw std::runtime_error("Cube::apply: failed writing to output file: " + out_name);
+
+        instance = out_name;
+    }
 }
 
-//
 int Cube::simplify(bool ext, char cutoff) {
     // simplification
     std::stringstream scmd;
@@ -159,19 +249,78 @@ void Cube::gen_cube(std::string cubing_mode, int numMCTS) {
     system(cmd.str().c_str());
     d += 1;
 
+    // Build output cube filename: <cnf>.<id><index>.cube
     std::stringstream nc;
     nc << cnf << "." << id << index << ".cube";
     nextcube = nc.str();
 
-    if (cube == "") {
-        mvcmd << "mv " << simp_inst << ".temp " << nextcube;
-    } else {
-        mvcmd << "sed -E \"s/^a (.*)/$(head -n " << index << " " << cube;
-        mvcmd << " | tail -n 1 | sed -E \'s/(.*) 0/\\1/\') \\1/\" ";
-        mvcmd << simp_inst << ".temp > ";
-        mvcmd << nextcube;
+    const std::string temp_file = simp_inst + ".temp";
+
+    // If no previous cube, just rename temp -> nextcube
+    if (cube.empty()) {
+        if (std::rename(temp_file.c_str(), nextcube.c_str()) != 0)
+            throw std::runtime_error("gen_cube: rename failed from " + temp_file + " to " + nextcube);
+        return;
     }
-    system(mvcmd.str().c_str());
+
+    // Otherwise we must prepend the selected cube line
+    std::ifstream fin_cube(cube);
+    if (!fin_cube)
+        throw std::runtime_error("gen_cube: cannot open cube file: " + cube);
+
+    // Read the 'index'-th line (1-based)
+    long long idx = std::stoll(index);
+    std::string cube_line;
+    {
+        long long line_no = 0;
+        for (std::string line; std::getline(fin_cube, line); ) {
+            if (++line_no == idx) {
+                cube_line = line;
+                break;
+            }
+        }
+    }
+    if (cube_line.empty())
+        throw std::runtime_error("gen_cube: cube index " + index + " out of range in " + cube);
+
+    // Trim trailing whitespace
+    auto rtrim = [](std::string &s) {
+        while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())))
+            s.pop_back();
+    };
+    rtrim(cube_line);
+
+    // Remove trailing " 0" if present
+    if (cube_line.size() >= 2 &&
+        cube_line[cube_line.size() - 2] == ' ' &&
+        cube_line[cube_line.size() - 1] == '0') {
+        cube_line.erase(cube_line.size() - 2);
+        rtrim(cube_line);
+    }
+
+    // Apply substitution: for lines starting with "a ", replace "a " with "<cube_line> "
+    std::ifstream fin_temp(temp_file);
+    if (!fin_temp)
+        throw std::runtime_error("gen_cube: cannot open temp file: " + temp_file);
+
+    std::ofstream fout(nextcube);
+    if (!fout)
+        throw std::runtime_error("gen_cube: cannot create output file: " + nextcube);
+
+    std::string line;
+    while (std::getline(fin_temp, line)) {
+        if (line.size() >= 2 && line[0] == 'a' && line[1] == ' ') {
+            fout << cube_line << " " << line.substr(2) << "\n";
+        } else {
+            fout << line << "\n";
+        }
+    }
+
+    fin_temp.close();
+    fout.close();
+
+    // Clean up temporary file
+    std::remove(temp_file.c_str());
 }
 
 int Cube::solve(int timeout) {
