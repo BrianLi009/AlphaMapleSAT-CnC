@@ -11,6 +11,7 @@
 #include <set>
 #include <deque>
 #include <algorithm>
+#include <time.h>
 
 #include "symbreak.hpp"
 #include "exhaustive.hpp"
@@ -84,6 +85,7 @@ class App : public Handler, public Terminator {
 
   // Terminator interface.
   //
+
   bool terminate () { return timesup; }
 
   // Handler interface.

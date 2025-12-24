@@ -1632,4 +1632,6 @@ void Solver::add_trusted_clause (const vector<int> &clause) {
   if(proof_specified) internal->proof->add_trusted_clause (clause);
 }
 
+double Solver::progress() { return internal->progress; };
+
 } // namespace CaDiCaL

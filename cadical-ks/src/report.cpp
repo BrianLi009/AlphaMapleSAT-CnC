@@ -156,6 +156,7 @@ static const int num_reports = // as compile time constant
 /*------------------------------------------------------------------------*/
 
 void Internal::report (char type, int verbose) {
+  progress = active () / (double) external->max_var;
   if (!opts.report)
     return;
 #ifdef LOGGING

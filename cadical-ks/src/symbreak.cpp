@@ -62,6 +62,7 @@ SymmetryBreaker::~SymmetryBreaker () {
         delete [] assign;
         delete [] colsuntouched;
         delete [] fixed;
+        /*
         printf("Number of solutions   : %ld\n", sol_count);
         printf("Canonical subgraphs   : %-12" PRIu64 "   (%.0f /sec)\n", canon, canon/canontime);
         for(int i=2; i<n; i++) {
@@ -89,6 +90,7 @@ SymmetryBreaker::~SymmetryBreaker () {
             }
             printf("Total unembed. graphs : %ld\n", muscount);
         }
+        */
     }
 }
 

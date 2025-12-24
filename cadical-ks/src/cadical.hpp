@@ -902,6 +902,8 @@ public:
   //
   static void build (FILE *file, const char *prefix = "c ");
 
+  double progress();
+
 private:
   //==== start of state ====================================================
 
