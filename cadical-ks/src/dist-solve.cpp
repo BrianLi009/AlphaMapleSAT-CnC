@@ -148,7 +148,8 @@ void Manager::start() {
                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             printf("c PROGRESS UPDATE: %d: %lf\n", rank, progress);
             fflush(stdout);
-            pt.update(rank, progress);
+            if (winfo[rank].status == SOLVING)
+                pt.update(rank, progress);
         }
         fflush(stdout);
     }
@@ -236,6 +237,9 @@ int Worker::simplify() {
     max_var = solver->active ();
     res = solver->solve ();
     if (res == 0) { write_file(); }
+    delete se;
+    delete solver;
+    solver = 0;
     return res;
 }
 
